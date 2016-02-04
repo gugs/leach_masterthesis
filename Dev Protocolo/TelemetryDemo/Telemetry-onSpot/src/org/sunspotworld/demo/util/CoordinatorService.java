@@ -30,6 +30,7 @@ import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.util.Utils;
 import java.io.IOException;
 import java.util.Random;
+import java.util.Timer;
 import java.util.Vector;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
@@ -59,6 +60,8 @@ public class CoordinatorService implements PacketTypes{
     private Thread thread = null;
     private boolean checking = false;
     private int ledColor = 0;
+    private long now = 0L;
+    private long timeOut = 2000; //miliseconds
 
     private Vector addressNodes;
     
@@ -93,16 +96,23 @@ public class CoordinatorService implements PacketTypes{
 
     public CoordinatorService()
     {
-    
+        init();
     }
 
     private void init()
     {
         //LEACH
-        ledColor = (int)(random.nextInt()*255);
+        random = new Random();
+        ledColor = (int)random.nextInt(4);
+        ledcolor++;
         ourMacAddress = Spot.getInstance().getRadioPolicyManager().getIEEEAddress();
         addressNodes = new Vector();
 
+    }
+
+    public int getCHColor()
+    {
+        return ledColor;
     }
  
     /**
@@ -117,23 +127,27 @@ public class CoordinatorService implements PacketTypes{
     /**
      * Start searching for a service
      */
-    public void start() {
-        checking = true;
+    public void start()
+    {
+
+        
         thread = new Thread() {
             public void run() {
                 coordinatorLoop();
             }
         };
         thread.start();
+
     }
     
 
     /**
      * Stop searching for a service
      */
-    public void stop() {
-        checking = false;
-        if (thread != null) {
+    public void stop()
+    {
+        if (thread != null)
+        {
             thread.interrupt();
             thread = null;
         }
@@ -158,7 +172,7 @@ public class CoordinatorService implements PacketTypes{
         return xdg;
     }
     
-    private Datagram writeTDMASchedule (byte cmd, Datagram xdg, long address, double time)
+    private Datagram writeTDMASchedule (long address, byte cmd, Datagram xdg , double time)
     {
         try
         {
@@ -181,46 +195,69 @@ public class CoordinatorService implements PacketTypes{
      */
     private void coordinatorLoop ()
     {
-        
+            boolean received = false;
+
+            led.setOff();
+            led.setRGB(ledColor,40,100);                // Yellow = looking for display server
+            led.setOn();
+            Utils.sleep(2000);
+
             RadiogramConnection txConn = null;
             RadiogramConnection rcvConn = null;
+
+            now = 0L;
+
             Utils.sleep(200);  // wait a bit to give any previously running instance a chance to exit
             // this outer loop is for retrying if there is an exception
             int tries = 2;
 
                 try
                 {
-                   txConn = (RadiogramConnection) Connector.open("radiogram://broadcast:" + port);
-                   txConn.setMaxBroadcastHops(numHops);
+                   txConn = (RadiogramConnection) Connector.open("radiogram://broadcast:" + BROADCAST_PORT);
                    Datagram xdg = txConn.newDatagram(20);
 
+                    led.setOff();
+                    led.setRGB(255,255,100);                // Yellow = looking for display server
+                    led.setOn();
+                    Utils.sleep(2000);
                    if (led != null)
                    {
                       led.setRGB(ledColor,40,0);                // Yellow = looking for display server
                       led.setOn();
                    }
 
-                   xdg = writeCoordinatorAddressInHeader(ADV_PACKET, xdg, ourMacAddress, ledColor);
+                   xdg = writeCoordinatorAddressInHeader(ADV_PACKET, xdg,
+                           ourMacAddress, ledColor);
+                   led.setOff();
+                   led.setRGB(0, 100, 100);
+                   led.setOn();
+                   Utils.sleep(500);
+                   txConn.send(xdg);
+                   
 
-                   while(tries < 2)
-                   {
-                       txConn.send(xdg);
-                       Utils.sleep(100);
-                       tries++;
-                   }
-
-                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + port);
-                   rcvConn.setTimeout(300);    // timeout in 300 msec - so receive() will not deep sleep
-                   rcvConn.setRadioPolicy(RadioPolicy.AUTOMATIC);  // but allow deep sleep other times
+                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + BROADCAST_PORT);
+                   //rcvConn.setTimeout(300);    // timeout in 300 msec - so receive() will not deep sleep
                    Radiogram rdg = (Radiogram)rcvConn.newDatagram(20);
 
-                   while(checking == true && thread == Thread.currentThread())
+                   now = System.currentTimeMillis();
+
+                   while((System.currentTimeMillis() - now < timeOut) && received == true  )
                    {
-                        rcvConn.receive(rdg);
+                        led.setOff();
+                        led.setRGB(100, 0, 100);
+                        led.setOn();
+                        Utils.sleep(500);
+                        rcvConn.setTimeout(1000);
+                        rcvConn.receive(rdg);                 
+
 
                         if(rdg.readByte() == JOIN_PACKET)
                         {
                             addressNodes.addElement(rdg.getAddress());
+                            led.setOff();
+                            led.setRGB(255, 0, 0);
+                            led.setOn();
+                            Utils.sleep(2000);
                         }
 
                         //qual a melhor condicao de sair do laco? timeout
@@ -232,7 +269,7 @@ public class CoordinatorService implements PacketTypes{
                    {
                        xdg.reset();
                        endereco = ((Long)addressNodes.elementAt(i)).longValue();
-                       txConn.send(writeTDMASchedule(TDMA_PACKET, xdg, endereco, (double)0.10));
+                       txConn.send(writeTDMASchedule(endereco, TDMA_PACKET, xdg,(double)0.10));
                    }
 
                    //problema de sincronismo de tempo
@@ -241,8 +278,10 @@ public class CoordinatorService implements PacketTypes{
                 {
                     ex.printStackTrace();
                 }
-                        
-
+                finally
+                {
+                    led.setOff();
+                }
     }
 
 }

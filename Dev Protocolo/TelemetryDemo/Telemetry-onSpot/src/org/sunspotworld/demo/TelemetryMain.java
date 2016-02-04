@@ -122,13 +122,17 @@ public class TelemetryMain extends MIDlet
     private PacketReceiver rcvrBS;
     private PacketTransmitter xmit;
     private RadiogramConnection hostConn;
-    private Thread listeningBaseStation = null;
+    private int maxRssiCoordinator = 0;
+    private String clusterHeadAddress = "";
+    private int clusterHeadColor = 0;
     //private AccelMonitor accelMonitor = null;
 
     private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
     private ITriColorLED led1 = leds.getLED(0);
     private ITriColorLED led2 = leds.getLED(1);
     private ITriColorLED led4 = leds.getLED(3);
+    private ITriColorLED led6 = leds.getLED(5);
+    private ITriColorLED led7 = leds.getLED(6);
     private ITriColorLED led8 = leds.getLED(7);
 
     //leach variables
@@ -139,7 +143,6 @@ public class TelemetryMain extends MIDlet
     private double probability = 0;
     private boolean isCH = false;
     private boolean isCT = false;
-    private boolean endFormClust = false;
     private Random r;
     
     /////////////////////////////////////////////////////
@@ -172,13 +175,15 @@ public class TelemetryMain extends MIDlet
     /**
      * Main application run loop.
      */
-    public void run() {
+    public void run()
+    {
         System.out.println("Spot acceleration telemetry recorder  (version " + VERSION + ")");
         led1.setRGB(50,0,0);     // Red = not active
         led1.setOn();
 
         locator.start();            // look for host app and call serviceLocated() when found
-        while (true) {
+        while (true)
+        {
             Utils.sleep(30000);     // real work is done elsewhere; allow deep sleep while trying to connect
         }
     }
@@ -192,104 +197,35 @@ public class TelemetryMain extends MIDlet
 
     private void startListeningBaseStation()
     {
-
-        try {
-            hostConn = (RadiogramConnection) Connector.open("radiogram://:"+CONNECTED_PORT);
+        try
+        {
+            hostConn = (RadiogramConnection) Connector.open("radiogram://:"+BROADCAST_PORT);
             rcvrBS = new PacketReceiver(hostConn);        // set up thread to receive & dispatch commands
             rcvrBS.setServiceName("Base Station Command Server");
-
             rcvrBS.registerHandler(this, START_APP);     // specify commands this class handles
             rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
             rcvrBS.registerHandler(this, START_LEACH_ENGINE);
             rcvrBS.registerHandler(this, STOP_LEACH_ENGINE);
+            rcvrBS.registerHandler(this, JOIN_PACKET);
+            rcvrBS.registerHandler(this, ADV_PACKET);
+            rcvrBS.registerHandler(this, TDMA_PACKET);
+            rcvrBS.registerHandler(this, DATA_PACKET);
             rcvrBS.start();
-        } catch (IOException ex)
+        }
+        catch (IOException ex)
         {
             ex.printStackTrace();
         }
-        
-        
-        if(false){
-        
-            try {
-                hostConn = (RadiogramConnection) Connector.open("radiogram://:"+CONNECTED_PORT);
-                Datagram rdx = hostConn.newDatagram(20);
-                hostConn.receive(rdx);
-
-                if(rdx.readByte() == START_APP)
-                {
-                    led8.setRGB(0, 0, 100);
-                    led8.setOn();
-                }
-            }
-            catch (IOException ex)
-            {
-                ex.printStackTrace();
-            }
-
-        }
     }
 
-    /**
-     * Callback from LocateService when the host display service has been contacted.
-     * This routine will setup both PacketReceiver & PacketTransmitter services
-     * to handle communications with the host service. Registers which commands
-     * this class handles.
-     *
-     * @param serviceAddress the IEEE address of the host display service
-     */
-//    public void serviceLocated(long serviceAddress) {
-//        try {
-//            if (hostConn != null) {
-//                hostConn.close();
-//            }
-//            hostConn = (RadiogramConnection)Connector.open("radiogram://" +
-//                            IEEEAddress.toDottedHex(serviceAddress) + ":" + CONNECTED_PORT);
-//
-//            //hostConn2 = (RadiogramConnection)Connector.open("radiogram://:" + CONNECTED_PORT);
-//
-//            hostConn.setTimeout(-1);    // no timeout
-//        } catch (IOException ex) {
-//            System.out.println("Failed to open connection to host: " + ex);
-//            closeConnection();
-//            return;
-//        }
-//        connected = true;
-//        led1.setRGB(0, 30, 0);           // Green = connected
-//
-//        xmit = new PacketTransmitter(hostConn);     // set up thread to transmit replies to host
-//        xmit.setServiceName("Telemetry Xmitter");
-//        xmit.start();
-//
-//        rcvr = new PacketReceiver(hostConn);        // set up thread to receive & dispatch commands
-//        rcvr.setServiceName("Telemetry Command Server");
-//
-//        rcvr.registerHandler(this, DISPLAY_SERVER_RESTART);     // specify commands this class handles
-//        rcvr.registerHandler(this, DISPLAY_SERVER_QUITTING);
-//        rcvr.registerHandler(this, PING_REQ);
-//        rcvr.registerHandler(this, BLINK_LEDS_REQ);
-//
-//        //LEACH
-//        rcvr.registerHandler(this, TDMA_PACKET);
-//        rcvr.registerHandler(this, DATA_PACKET);
-//        rcvr.registerHandler(this, ADV_PACKET);
-//        rcvr.registerHandler(this, JOIN_PACKET);
-//
-//        rcvr.registerHandler(this, REPLAY_LEACH_ENGINE);
-//        rcvr.registerHandler(this, START_LEACH_ENGINE);
-//        rcvr.registerHandler(this, STOP_LEACH_ENGINE);
-//        rcvr.registerHandler(this, RESET_LEACH_ENGINE);
-//        rcvr.start();
-//
-//        //accelMonitor.setPacketConnection(xmit, rcvr);
-//        //accelMonitor.getAccInfo();     // notify host about accelerometer settings
-//    }
 
     /**
      * Called to declare that the connection to the host is no longer present.
      */
-    public void closeConnection() {
-        if (!connected) {
+    public void closeConnection()
+    {
+        if (!connected)
+        {
             return;
         }
         led1.setRGB(50,0,0);     // Red = not active
@@ -329,7 +265,6 @@ public class TelemetryMain extends MIDlet
         {
             switch (type)
             {
-
                 //Base station commands
                 case START_APP:
                     led8.setRGB(0, 0, 100);
@@ -347,11 +282,16 @@ public class TelemetryMain extends MIDlet
 
                 //LEACH
                 case START_LEACH_ENGINE:
-
                     led4.setRGB(0, 100, 100);
                     led4.setOn();
                     Utils.sleep(250);
                     led4.setOff();
+
+                    led7.setOff();
+                    led8.setOff();
+
+                    maxRssiCoordinator = 0;
+                    led8.setOff();
 
                     if(roundNumber >= 1/percentage)
                     {
@@ -359,7 +299,9 @@ public class TelemetryMain extends MIDlet
                         isCH = false;
                         isCT = false;
                     }
+
                     randomNumber = r.nextDouble();
+
                     if(isCH)
                     {
                         isCH = false;
@@ -377,7 +319,8 @@ public class TelemetryMain extends MIDlet
                         }
                         else
                         {
-                            probability = percentage/(1-percentage*(roundNumber % (int)(1/percentage)));
+                            probability = percentage/(1-percentage*
+                                    (roundNumber % (int)(1/percentage)));
                         }
 
                     }
@@ -386,33 +329,60 @@ public class TelemetryMain extends MIDlet
                         //ajustar timer
                         //enviar mensagem de ADV
                         isCH = true;
+                        locator.setStatusLed(led6);
                         locator.start();
-                        blinkLEDs();
-
-
+                        clusterHeadColor = locator.getCHColor();
+                        led8.setOff();
+                        led8.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
+                        led8.setOn();
+                        led7.setOff();
+                        led7.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
+                        led7.setOn();
+                        //blinkLEDs();
                     }
-                    if(!isCH)
+                    else
                     {
-                                                
-                        //joinCH()
+                        locator.stop();
                     }
+                    
                     //setTimer(START_ROUND, roundLenght);
                     roundNumber++;
                     led1.setRGB(0, 50, 0);
                     led1.setOn();
                     break;
-                    
+
+                case ADV_PACKET:
+
+                    if(maxRssiCoordinator < pkt.getRssi())
+                    {
+                        pkt.resetRead();
+                        byte header = pkt.readByte();
+                        long address = pkt.readLong();
+                        clusterHeadColor = pkt.readInt();
+                        led8.setOff();
+                        led8.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
+                        led8.setOn();
+                        maxRssiCoordinator = pkt.getRssi();
+                        clusterHeadAddress = IEEEAddress.toDottedHex(address);
+                    }
+                    break;
+
+                case JOIN_PACKET:
+
+                    break;
                 //END LEACH
 
                 case DISPLAY_SERVER_QUITTING:
                     closeConnection();              // we need to reconnect to host
                     break;
+
                 case PING_REQ:
                     led2.setRGB(40, 0, 0);       // Red = ping
                     led2.setOn();
                     sendPingReply(pkt);
                     led2.setOff();
                     break;
+
                 case BLINK_LEDS_REQ:
                     blinkLEDs();
                     if (connected) 
@@ -434,7 +404,9 @@ public class TelemetryMain extends MIDlet
                         blinkLEDs();
                     break;
             }
-        } catch (IOException ex) {
+        } 
+        catch (IOException ex)
+        {
             closeConnection();
         }
     }

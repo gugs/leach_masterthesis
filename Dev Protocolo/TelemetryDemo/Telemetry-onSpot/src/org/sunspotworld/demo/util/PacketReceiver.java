@@ -24,10 +24,8 @@ package org.sunspotworld.demo.util;
 
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
-import com.sun.spot.peripheral.radio.RadioPolicy;
 import com.sun.spot.resources.Resource;
 import com.sun.spot.service.IService;
-
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Enumeration;

@@ -184,33 +184,49 @@ public class PacketTransmitter extends Resource implements IService {
         txConn.send(dg);
     }
 
+
+
+
     /**
      * The main transmit loop.
      */
-    private void transmitLoop() {
+    private void transmitLoop()
+    {
         status = RUNNING;
         Random random = new Random();
-        while (status == RUNNING && thread == Thread.currentThread()) {
+        while (status == RUNNING && thread == Thread.currentThread())
+        {
             Datagram xdg = (Datagram) xmitQueue.get();
             if (xdg != null) {
                 try {
                     for (int tries = 1; tries < 5; tries++) {
-                        try {
+                        try
+                        {
                             txConn.send(xdg);     // normally takes 9-12 msec, but can take 70+ msec
                             break;
-                        } catch (NoAckException ne) {
+                        } 
+                        catch (NoAckException ne)
+                        {
                             System.err.println("No Ack: " + ne.toString());
-                        } catch (ChannelBusyException be) {
+                        } 
+                        catch (ChannelBusyException be)
+                        {
                             System.err.println("Busy Channel: " + be.toString());
                         }
                         Utils.sleep(tries * (3 + random.nextInt(10)));    // backoff by random time
                     }
                     Thread.yield();
-                } catch (IOException ie) {
+                } 
+                catch (IOException ie)
+                {
                     System.err.println("IO exception: " + ie.toString());
-                } catch (Exception e) {
+                } 
+                catch (Exception e)
+                {
                     System.err.println("SENDER problem " + e);
-                } finally {
+                } 
+                finally
+                {
                     freeQueue.put(xdg);
                 }
             }
