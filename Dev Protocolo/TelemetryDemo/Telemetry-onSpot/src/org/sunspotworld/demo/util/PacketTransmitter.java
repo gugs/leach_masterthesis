@@ -122,7 +122,7 @@ public class PacketTransmitter extends Resource implements IService {
      * @param rdg the Radiogram to write the header info into
      * @param type the type of data packet to send
      */
-    public void writeHeader(Radiogram rdg, byte type) {
+    public void writeHeader(Datagram rdg, byte type) {
         try {
             rdg.reset();
             rdg.writeByte(type);

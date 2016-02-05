@@ -83,6 +83,6 @@ public interface PacketTypes {
     public static final byte DISPLAY_SERVER_AVAIL_REPLY = 101;
     
     /** Cluster Head Percentual*/
-    public static final float PERCENTAGE_CLUSTER_HEAD = (float) 0.1;
+    public static final float PERCENTAGE_CLUSTER_HEAD = (float) 0.2;
 
 }

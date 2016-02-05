@@ -23,14 +23,12 @@
 package org.sunspotworld.demo.util;
 
 import com.sun.spot.peripheral.Spot;
-import com.sun.spot.peripheral.radio.RadioPolicy;
 import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.util.Utils;
 import java.io.IOException;
 import java.util.Random;
-import java.util.Timer;
 import java.util.Vector;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
@@ -62,7 +60,6 @@ public class CoordinatorService implements PacketTypes{
     private int ledColor = 0;
     private long now = 0L;
     private long timeOut = 2000; //miliseconds
-
     private Vector addressNodes;
     
     /**
@@ -104,7 +101,7 @@ public class CoordinatorService implements PacketTypes{
         //LEACH
         random = new Random();
         ledColor = (int)random.nextInt(4);
-        ledcolor++;
+        ledColor++;
         ourMacAddress = Spot.getInstance().getRadioPolicyManager().getIEEEAddress();
         addressNodes = new Vector();
 
@@ -195,6 +192,7 @@ public class CoordinatorService implements PacketTypes{
      */
     private void coordinatorLoop ()
     {
+            System.out.println("Entrei no loop do coordenador 1");
             boolean received = false;
 
             led.setOff();
@@ -209,10 +207,10 @@ public class CoordinatorService implements PacketTypes{
 
             Utils.sleep(200);  // wait a bit to give any previously running instance a chance to exit
             // this outer loop is for retrying if there is an exception
-            int tries = 2;
 
                 try
                 {
+                   
                    txConn = (RadiogramConnection) Connector.open("radiogram://broadcast:" + BROADCAST_PORT);
                    Datagram xdg = txConn.newDatagram(20);
 
@@ -220,6 +218,8 @@ public class CoordinatorService implements PacketTypes{
                     led.setRGB(255,255,100);                // Yellow = looking for display server
                     led.setOn();
                     Utils.sleep(2000);
+
+                    System.out.println("Entrei no loop do coordenador 2");
                    if (led != null)
                    {
                       led.setRGB(ledColor,40,0);                // Yellow = looking for display server
@@ -233,23 +233,26 @@ public class CoordinatorService implements PacketTypes{
                    led.setOn();
                    Utils.sleep(500);
                    txConn.send(xdg);
-                   
 
-                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + BROADCAST_PORT);
+                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + CONNECTED_PORT);
+
                    //rcvConn.setTimeout(300);    // timeout in 300 msec - so receive() will not deep sleep
                    Radiogram rdg = (Radiogram)rcvConn.newDatagram(20);
 
                    now = System.currentTimeMillis();
 
-                   while((System.currentTimeMillis() - now < timeOut) && received == true  )
+                   System.out.println("Entrei no loop do coordenador 3");
+
+                   while((System.currentTimeMillis() - now < timeOut) && received == false )
                    {
                         led.setOff();
-                        led.setRGB(100, 0, 100);
+                        led.setRGB(0, 255, 0);
                         led.setOn();
                         Utils.sleep(500);
-                        rcvConn.setTimeout(1000);
-                        rcvConn.receive(rdg);                 
+                        //rcvConn.setTimeout(1000);
+                        rcvConn.receive(rdg);
 
+                        System.out.println("Entrei no loop do coordenador 4");
 
                         if(rdg.readByte() == JOIN_PACKET)
                         {
@@ -258,6 +261,8 @@ public class CoordinatorService implements PacketTypes{
                             led.setRGB(255, 0, 0);
                             led.setOn();
                             Utils.sleep(2000);
+
+                            System.out.println("Entrei no loop do coordenador 5");
                         }
 
                         //qual a melhor condicao de sair do laco? timeout

@@ -125,6 +125,7 @@ public class TelemetryMain extends MIDlet
     private int maxRssiCoordinator = 0;
     private String clusterHeadAddress = "";
     private int clusterHeadColor = 0;
+    private int rssi = 0;
     //private AccelMonitor accelMonitor = null;
 
     private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
@@ -282,6 +283,9 @@ public class TelemetryMain extends MIDlet
 
                 //LEACH
                 case START_LEACH_ENGINE:
+
+                    leds.setOff();
+
                     led4.setRGB(0, 100, 100);
                     led4.setOn();
                     Utils.sleep(250);
@@ -332,12 +336,11 @@ public class TelemetryMain extends MIDlet
                         locator.setStatusLed(led6);
                         locator.start();
                         clusterHeadColor = locator.getCHColor();
-                        led8.setOff();
-                        led8.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
-                        led8.setOn();
-                        led7.setOff();
-                        led7.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
-                        led7.setOn();
+
+                        leds.getLED(clusterHeadColor).setOff();
+                        leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
+                        leds.getLED(clusterHeadColor).setOn();
+
                         //blinkLEDs();
                     }
                     else
@@ -353,17 +356,44 @@ public class TelemetryMain extends MIDlet
 
                 case ADV_PACKET:
 
-                    if(maxRssiCoordinator < pkt.getRssi())
+                    if(!isCH)
                     {
-                        pkt.resetRead();
-                        byte header = pkt.readByte();
-                        long address = pkt.readLong();
-                        clusterHeadColor = pkt.readInt();
-                        led8.setOff();
-                        led8.setRGB(clusterHeadColor, clusterHeadColor, clusterHeadColor);
-                        led8.setOn();
-                        maxRssiCoordinator = pkt.getRssi();
-                        clusterHeadAddress = IEEEAddress.toDottedHex(address);
+                        if(maxRssiCoordinator < pkt.getRssi())
+                        {
+                            System.out.println("Aqui vc tem de entrar de todo jeito!");
+                            for(int i = 1; i < 5; i++)
+                            {
+                                leds.getLED(i).setOff();
+                            }
+                            
+                            pkt.resetRead();
+                            byte header = pkt.readByte();
+                            long address = pkt.readLong();
+                            clusterHeadColor = pkt.readInt();
+                            leds.getLED(clusterHeadColor).setOff();
+                            leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
+                            leds.getLED(clusterHeadColor).setOn();
+                            System.out.println("Endereco: radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
+                        
+                            if(hostConn != null)
+                            {
+                                hostConn.close();
+                            }
+
+                            hostConn = (RadiogramConnection) Connector.open("radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
+                           
+                            hostConn.setTimeout(-1);
+                            Datagram answerCH = hostConn.newDatagram(20);
+                            xmit = new PacketTransmitter(hostConn);
+                            rcvrBS = new PacketReceiver(hostConn);
+                            
+                            answerCH = (xmit.newDataPacket(JOIN_PACKET));
+                            
+                            xmit.send(answerCH);
+                            
+                            Utils.sleep(100);
+                            
+                        }
                     }
                     break;
 
