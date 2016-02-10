@@ -26,7 +26,10 @@ import com.sun.spot.peripheral.Spot;
 import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
+import com.sun.spot.util.IEEEAddress;
+import com.sun.spot.util.Queue;
 import com.sun.spot.util.Utils;
+import com.sun.squawk.util.Arrays;
 import java.io.IOException;
 import java.util.Random;
 import java.util.Vector;
@@ -169,13 +172,12 @@ public class CoordinatorService implements PacketTypes{
         return xdg;
     }
     
-    private Datagram writeTDMASchedule (long address, byte cmd, Datagram xdg , double time)
+    private Datagram writeTDMASchedule (byte cmd, Datagram xdg , double time)
     {
         try
         {
             xdg.reset();
             xdg.writeByte(cmd);
-            xdg.writeLong(address);
             xdg.writeDouble(time);
         }
         catch (IOException ex)
@@ -237,7 +239,7 @@ public class CoordinatorService implements PacketTypes{
                    rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + CONNECTED_PORT);
 
                    //rcvConn.setTimeout(300);    // timeout in 300 msec - so receive() will not deep sleep
-                   Radiogram rdg = (Radiogram)rcvConn.newDatagram(20);
+                   Radiogram rdg = (Radiogram)rcvConn.newDatagram(rcvConn.getMaximumLength());
 
                    now = System.currentTimeMillis();
 
@@ -248,11 +250,16 @@ public class CoordinatorService implements PacketTypes{
                         led.setOff();
                         led.setRGB(0, 255, 0);
                         led.setOn();
-                        Utils.sleep(500);
+                        Utils.sleep(400);
                         //rcvConn.setTimeout(1000);
+                        System.out.println("Entrei no loop do coordenador 4");
                         rcvConn.receive(rdg);
 
-                        System.out.println("Entrei no loop do coordenador 4");
+                        byte teste = rdg.readByte();
+                        rdg.resetRead();
+                        System.out.println("Cabecalho do pacote: "+teste);
+
+                        
 
                         if(rdg.readByte() == JOIN_PACKET)
                         {
@@ -268,15 +275,22 @@ public class CoordinatorService implements PacketTypes{
                         //qual a melhor condicao de sair do laco? timeout
                    }
 
-                   long endereco = 0;
-
+                   //long endereco = 0;
+                   System.out.println("Entrei no loop do coordenador 6");
+                   System.out.println("Outside Vector size: "+addressNodes.size());
                    for(int i = 0; i < addressNodes.size(); i++)
                    {
+                       System.out.println("Inside loop Vector size: "+addressNodes.size());
                        xdg.reset();
-                       endereco = ((Long)addressNodes.elementAt(i)).longValue();
-                       txConn.send(writeTDMASchedule(endereco, TDMA_PACKET, xdg,(double)0.10));
-                   }
+                       System.out.println((String)addressNodes.elementAt(i));
 
+                       //endereco = Long.parseLong((String)addressNodes.elementAt(i));
+                       //System.out.println("End: "+endereco);
+                       //txConn.close();
+                       //txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
+                       //txConn.send(writeTDMASchedule(TDMA_PACKET, xdg,(double)0.10));
+                   }
+                   System.out.println("Entrei no loop do coordenador 7");
                    //problema de sincronismo de tempo
                 }
                 catch (IOException ex)

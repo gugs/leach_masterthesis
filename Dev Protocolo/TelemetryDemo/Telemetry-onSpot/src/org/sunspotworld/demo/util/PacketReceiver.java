@@ -113,7 +113,8 @@ public class PacketReceiver extends Resource implements IService {
             status = RUNNING;
             
             while (status == RUNNING && thread == Thread.currentThread()) {
-                try {
+                try
+                {
                     rcvConn.receive(rdg);
                     byte packetType = rdg.readByte();
                     synchronized (this) { // we don't allow new handlers to be added in this section
@@ -157,7 +158,8 @@ public class PacketReceiver extends Resource implements IService {
     ////////////////////////////////
     
     /**
-     * Stop packet receiver service if running.
+     * Stopf
+     * packet receiver service if running.
      *
      * @return true if will stop service
      */

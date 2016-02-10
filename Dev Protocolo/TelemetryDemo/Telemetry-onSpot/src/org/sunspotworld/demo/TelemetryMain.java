@@ -374,30 +374,38 @@ public class TelemetryMain extends MIDlet
                             leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
                             leds.getLED(clusterHeadColor).setOn();
                             System.out.println("Endereco: radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
-                        
+                            
+                            rcvrBS.stop();
+
                             if(hostConn != null)
                             {
                                 hostConn.close();
                             }
 
                             hostConn = (RadiogramConnection) Connector.open("radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
-                           
                             hostConn.setTimeout(-1);
-                            Datagram answerCH = hostConn.newDatagram(20);
+                            
+                            //rcvrBS.start();
+
+
+                            Datagram answerCH = hostConn.newDatagram(hostConn.getMaximumLength());
                             xmit = new PacketTransmitter(hostConn);
-                            rcvrBS = new PacketReceiver(hostConn);
-                            
-                            answerCH = (xmit.newDataPacket(JOIN_PACKET));
-                            
+                            xmit.start();
+
+                            // verificar pq o Packet Receiver está dando Null Point Ex...
+                            // Aparentemente pode ser devido a mudanca do hostConn...
+
+                            answerCH = (xmit.newDataPacket(JOIN_PACKET));     
                             xmit.send(answerCH);
-                            
                             Utils.sleep(100);
                             
                         }
                     }
                     break;
 
-                case JOIN_PACKET:
+                case TDMA_PACKET:
+
+                    blinkLEDs();
 
                     break;
                 //END LEACH
