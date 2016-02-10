@@ -66,6 +66,15 @@ public class PacketReceiver extends Resource implements IService {
         rcvConn = conn;
         //rcvConn.setRadioPolicy(RadioPolicy.AUTOMATIC);
     }
+
+    public void setNewConnectionc(RadiogramConnection conn) {
+        registeredHandlers = new Vector[256];
+        for (int x = 0 ; x < 256 ; x++) {
+            registeredHandlers[x] = new Vector();
+        }
+        rcvConn = conn;
+        //rcvConn.setRadioPolicy(RadioPolicy.AUTOMATIC);
+    }
     
     /**
      * Register a handler for some packet type. Packets of this type will be

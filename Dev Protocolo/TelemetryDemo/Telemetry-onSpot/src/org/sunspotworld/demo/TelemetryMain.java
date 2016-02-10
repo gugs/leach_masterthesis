@@ -261,7 +261,8 @@ public class TelemetryMain extends MIDlet
      * @param type the command
      * @param pkt the radiogram with any other required information
      */
-    public void handlePacket(byte type, Radiogram pkt) {
+    public void handlePacket(byte type, Radiogram pkt)
+    {
         try
         {
             switch (type)
@@ -385,8 +386,7 @@ public class TelemetryMain extends MIDlet
                             hostConn = (RadiogramConnection) Connector.open("radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
                             hostConn.setTimeout(-1);
                             
-                            //rcvrBS.start();
-
+                            rcvrBS.start();
 
                             Datagram answerCH = hostConn.newDatagram(hostConn.getMaximumLength());
                             xmit = new PacketTransmitter(hostConn);
@@ -398,6 +398,19 @@ public class TelemetryMain extends MIDlet
                             answerCH = (xmit.newDataPacket(JOIN_PACKET));     
                             xmit.send(answerCH);
                             Utils.sleep(100);
+                            
+                            
+                            rcvrBS.stop();
+
+                            if(hostConn != null)
+                            {
+                                hostConn.close();
+                            }
+                            
+                            hostConn = (RadiogramConnection) Connector.open("radiogram://:"+CONNECTED_PORT);
+                            rcvrBS = new PacketReceiver(hostConn);
+                            rcvrBS.registerHandler(this, TDMA_PACKET);
+                            rcvrBS.start();
                             
                         }
                     }

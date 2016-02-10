@@ -286,11 +286,18 @@ public class CoordinatorService implements PacketTypes{
 
                        //endereco = Long.parseLong((String)addressNodes.elementAt(i));
                        //System.out.println("End: "+endereco);
-                       //txConn.close();
-                       //txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
-                       //txConn.send(writeTDMASchedule(TDMA_PACKET, xdg,(double)0.10));
+                       if(txConn != null && thread == Thread.currentThread())
+                       {
+                           txConn.close();
+                           txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
+                           Datagram newDg = txConn.newDatagram(txConn.getMaximumLength());
+                           newDg.writeByte(TDMA_PACKET);
+                           txConn.send(newDg);
+                           System.out.println("Entrei no loop do coordenador 7");
+                       }
+                       
                    }
-                   System.out.println("Entrei no loop do coordenador 7");
+                   System.out.println("Entrei no loop do coordenador 8");
                    //problema de sincronismo de tempo
                 }
                 catch (IOException ex)
