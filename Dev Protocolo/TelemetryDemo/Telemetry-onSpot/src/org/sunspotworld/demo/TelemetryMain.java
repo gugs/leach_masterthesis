@@ -45,7 +45,6 @@ import com.sun.spot.resources.transducers.ISwitchListener;
 import com.sun.spot.service.BootloaderListenerService;
 
 import java.io.IOException;
-import java.util.Hashtable;
 import java.util.Random;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
@@ -396,8 +395,9 @@ public class TelemetryMain extends MIDlet
                             // Aparentemente pode ser devido a mudanca do hostConn...
 
                             answerCH = (xmit.newDataPacket(JOIN_PACKET));     
+                            Utils.sleep(300);
                             xmit.send(answerCH);
-                            Utils.sleep(100);
+                            
                             
                             
                             rcvrBS.stop();
@@ -411,6 +411,7 @@ public class TelemetryMain extends MIDlet
                             rcvrBS = new PacketReceiver(hostConn);
                             rcvrBS.registerHandler(this, TDMA_PACKET);
                             rcvrBS.start();
+                            System.out.println("Aguardadndo recebimento de pacotes");
                             
                         }
                     }

@@ -26,6 +26,7 @@ import com.sun.spot.peripheral.Spot;
 import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
+import com.sun.spot.peripheral.TimeoutException;
 import com.sun.spot.util.IEEEAddress;
 import com.sun.spot.util.Queue;
 import com.sun.spot.util.Utils;
@@ -62,7 +63,7 @@ public class CoordinatorService implements PacketTypes{
     private boolean checking = false;
     private int ledColor = 0;
     private long now = 0L;
-    private long timeOut = 2000; //miliseconds
+    private long timeOut = 500; //miliseconds
     private Vector addressNodes;
     
     /**
@@ -245,35 +246,47 @@ public class CoordinatorService implements PacketTypes{
 
                    System.out.println("Entrei no loop do coordenador 3");
 
-                   while((System.currentTimeMillis() - now < timeOut) && received == false )
-                   {
-                        led.setOff();
-                        led.setRGB(0, 255, 0);
-                        led.setOn();
-                        Utils.sleep(400);
-                        //rcvConn.setTimeout(1000);
-                        System.out.println("Entrei no loop do coordenador 4");
-                        rcvConn.receive(rdg);
+                   led.setOff();
+                   led.setRGB(0, 255, 0);
+                   led.setOn();
+                   //Utils.sleep(300);
 
-                        byte teste = rdg.readByte();
-                        rdg.resetRead();
-                        System.out.println("Cabecalho do pacote: "+teste);
 
+                   while((System.currentTimeMillis() - now < timeOut) )
+                   {     
+                        try
+                        {
+                            rcvConn.setTimeout(500);
+                            System.out.println("Entrei no loop do coordenador 4");
+                            rcvConn.receive(rdg);
+                        }
+                        catch(TimeoutException e)
+                        {
+                            System.out.println(e.getMessage()+"Primeiro");
+                            break;
+                        }
+                        //byte teste = rdg.readByte();
+                        //rdg.resetRead();
                         
+                        //System.out.println("Cabecalho do pacote: "+teste);
 
-                        if(rdg.readByte() == JOIN_PACKET)
+                        if(rdg.readByte() == JOIN_PACKET && !addressNodes.contains(rdg.getAddress()))
                         {
                             addressNodes.addElement(rdg.getAddress());
                             led.setOff();
                             led.setRGB(255, 0, 0);
                             led.setOn();
-                            Utils.sleep(2000);
-
+                            //Utils.sleep(2000);
+                            timeOut += 100;
                             System.out.println("Entrei no loop do coordenador 5");
+                            System.out.println("Tamanho do vetor atual: "+addressNodes.size());
                         }
-
                         //qual a melhor condicao de sair do laco? timeout
                    }
+
+                            led.setOff();
+                            led.setRGB(255, 255, 0);
+                            led.setOn();
 
                    //long endereco = 0;
                    System.out.println("Entrei no loop do coordenador 6");
@@ -302,11 +315,11 @@ public class CoordinatorService implements PacketTypes{
                 }
                 catch (IOException ex)
                 {
-                    ex.printStackTrace();
+                    System.out.println(ex.getMessage()+"Excecao 2");
                 }
                 finally
                 {
-                    led.setOff();
+                    
                 }
     }
 
