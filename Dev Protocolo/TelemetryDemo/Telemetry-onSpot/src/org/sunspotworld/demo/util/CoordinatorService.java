@@ -27,10 +27,7 @@ import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.TimeoutException;
-import com.sun.spot.util.IEEEAddress;
-import com.sun.spot.util.Queue;
 import com.sun.spot.util.Utils;
-import com.sun.squawk.util.Arrays;
 import java.io.IOException;
 import java.util.Random;
 import java.util.Vector;
@@ -188,15 +185,12 @@ public class CoordinatorService implements PacketTypes{
         return xdg;
     }
 
-
-
     /**
      * Internal loop to locate a remote display service and report its IEEE address back.
      */
     private void coordinatorLoop ()
     {
             System.out.println("Entrei no loop do coordenador 1");
-            boolean received = false;
 
             led.setOff();
             led.setRGB(ledColor,40,100);                // Yellow = looking for display server
@@ -281,35 +275,35 @@ public class CoordinatorService implements PacketTypes{
                             System.out.println("Entrei no loop do coordenador 5");
                             System.out.println("Tamanho do vetor atual: "+addressNodes.size());
                         }
-                        //qual a melhor condicao de sair do laco? timeout
                    }
 
                             led.setOff();
                             led.setRGB(255, 255, 0);
                             led.setOn();
 
-                   //long endereco = 0;
                    System.out.println("Entrei no loop do coordenador 6");
                    System.out.println("Outside Vector size: "+addressNodes.size());
+
                    for(int i = 0; i < addressNodes.size(); i++)
                    {
                        System.out.println("Inside loop Vector size: "+addressNodes.size());
                        xdg.reset();
                        System.out.println((String)addressNodes.elementAt(i));
 
-                       //endereco = Long.parseLong((String)addressNodes.elementAt(i));
-                       //System.out.println("End: "+endereco);
                        if(txConn != null && thread == Thread.currentThread())
                        {
                            txConn.close();
                            txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
                            Datagram newDg = txConn.newDatagram(txConn.getMaximumLength());
                            newDg.writeByte(TDMA_PACKET);
+                           newDg.writeByte(addressNodes.indexOf(addressNodes.elementAt(i)));
+                           newDg.writeByte(addressNodes.size());
                            txConn.send(newDg);
                            System.out.println("Entrei no loop do coordenador 7");
                        }
                        
                    }
+
                    System.out.println("Entrei no loop do coordenador 8");
                    //problema de sincronismo de tempo
                 }

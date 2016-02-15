@@ -360,6 +360,14 @@ public class PacketTransmitter extends Resource implements IService {
      */
     public void setEnabled(boolean enable) {
         // ignore
-    }    
+    }
+
+    public void setRadioPolicy(RadioPolicy policy)
+    {
+        if(txConn != null)
+        {
+            txConn.setRadioPolicy(policy.ON);
+        }
+    }
     
 }

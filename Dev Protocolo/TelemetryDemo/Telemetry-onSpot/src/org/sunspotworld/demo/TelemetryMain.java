@@ -45,6 +45,8 @@ import com.sun.spot.resources.transducers.ISwitchListener;
 import com.sun.spot.service.BootloaderListenerService;
 
 import java.io.IOException;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Random;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
@@ -108,26 +110,25 @@ import javax.microedition.midlet.MIDletStateChangeException;
 public class TelemetryMain extends MIDlet
         implements  PacketHandler, PacketTypes , ISwitchListener
 {
-    
-    private static final long SERVICE_CHECK_INTERVAL = 10000;   // = 10 seconds
+
     private static final String VERSION = "2.0";
+    private PeriodicTask tk;
     
     private boolean connected = false;
     private String messages[] = new String[50];
     private int stringIndex = 0;
+    private Random r;
     
     private CoordinatorService locator;
     private PacketReceiver rcvr;
     private PacketReceiver rcvrBS;
     private PacketTransmitter xmit;
     private RadiogramConnection hostConn;
-    private int maxRssiCoordinator = 0;
-    private String clusterHeadAddress = "";
-    private int clusterHeadColor = 0;
-    private int rssi = 0;
+
     //private AccelMonitor accelMonitor = null;
 
-    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
+    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.
+            lookup(ITriColorLEDArray.class);
     private ITriColorLED led1 = leds.getLED(0);
     private ITriColorLED led2 = leds.getLED(1);
     private ITriColorLED led4 = leds.getLED(3);
@@ -143,7 +144,12 @@ public class TelemetryMain extends MIDlet
     private double probability = 0;
     private boolean isCH = false;
     private boolean isCT = false;
-    private Random r;
+    private int maxRssiCoordinator = 0;
+    private String clusterHeadAddress = "";
+    private int clusterHeadColor = 0;
+    private byte indexSlotTimmer = 0;
+    private byte clusterLength = 0;
+    private final int tdmaSlotTime = 2000;
     
     /////////////////////////////////////////////////////
     //
@@ -360,6 +366,8 @@ public class TelemetryMain extends MIDlet
                     {
                         if(maxRssiCoordinator < pkt.getRssi())
                         {
+                            maxRssiCoordinator = pkt.getRssi();
+
                             System.out.println("Aqui vc tem de entrar de todo jeito!");
                             for(int i = 1; i < 5; i++)
                             {
@@ -373,7 +381,8 @@ public class TelemetryMain extends MIDlet
                             leds.getLED(clusterHeadColor).setOff();
                             leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
                             leds.getLED(clusterHeadColor).setOn();
-                            System.out.println("Endereco: radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
+                            clusterHeadAddress = IEEEAddress.toDottedHex(address);
+                            System.out.println("Endereco: radiogram://"+clusterHeadAddress+":"+CONNECTED_PORT);
                             
                             rcvrBS.stop();
 
@@ -382,7 +391,7 @@ public class TelemetryMain extends MIDlet
                                 hostConn.close();
                             }
 
-                            hostConn = (RadiogramConnection) Connector.open("radiogram://"+IEEEAddress.toDottedHex(address)+":"+CONNECTED_PORT);
+                            hostConn = (RadiogramConnection) Connector.open("radiogram://"+clusterHeadAddress+":"+CONNECTED_PORT);
                             hostConn.setTimeout(-1);
                             
                             rcvrBS.start();
@@ -418,21 +427,67 @@ public class TelemetryMain extends MIDlet
                     break;
 
                 case TDMA_PACKET:
+                    pkt.resetRead();
+                    byte header = pkt.readByte();
+                    indexSlotTimmer = (pkt.readByte());
+                    indexSlotTimmer++;
+                    clusterLength = pkt.readByte();
+                    System.out.println("Opa, sou: "+pkt.getAddress()+", e recebi"
+                            + "o pacote TDMA com os seguintes dados:\n -IndexSlotTimmer: "
+                            +indexSlotTimmer+"\n -ClusterLength: "+clusterLength);
 
-                    blinkLEDs();
 
+                case DATA_PACKET:
+
+                    if(!isCH)
+                    {
+                           rcvrBS.stop();
+                           xmit.stop();
+
+                           if (hostConn != null)
+                           {
+                                hostConn.close();
+                           }
+
+                           hostConn = (RadiogramConnection) Connector.open("radiogram://"+clusterHeadAddress+":"+CONNECTED_PORT);
+                           hostConn.setTimeout(-1);
+
+                           rcvrBS.start();
+
+                           Datagram dataPacket = hostConn.newDatagram(hostConn.getMaximumLength());
+                           xmit = new PacketTransmitter(hostConn);
+                           xmit.start();
+
+                           dataPacket = (xmit.newDataPacket(DATA_PACKET));
+                           Utils.sleep(300);
+                           xmit.send(dataPacket);
+
+                           tk = new PeriodicTask(0, (tdmaSlotTime/clusterLength)*indexSlotTimmer)
+                           {
+                                public void doTask()
+                                {
+                                    System.out.println("I saying hi, Endereco: "+
+                                        IEEEAddress.toDottedHex(Spot.getInstance().
+                                        getRadioPolicyManager().getIEEEAddress())+
+                                        ", Tempo de execucao: "+getTime(System.
+                                        currentTimeMillis()));
+                                    leds.getLED(clusterHeadColor).setOff();
+                                    leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
+                                    leds.getLED(clusterHeadColor).setOn();
+                                }
+                            };
+                            tk.start();
+
+                    }
+                    else
+                    {
+
+                    }
                     break;
                 //END LEACH
 
                 case DISPLAY_SERVER_QUITTING:
                     closeConnection();              // we need to reconnect to host
-                    break;
-
-                case PING_REQ:
-                    led2.setRGB(40, 0, 0);       // Red = ping
-                    led2.setOn();
-                    sendPingReply(pkt);
-                    led2.setOff();
                     break;
 
                 case BLINK_LEDS_REQ:
@@ -463,39 +518,25 @@ public class TelemetryMain extends MIDlet
         }
     }
     
-    // handle Ping command
-    private void sendPingReply(Radiogram pkt) throws IOException {
-        int linkQuality = pkt.getLinkQuality();
-        int corr = pkt.getCorr();
-        int rssi = pkt.getRssi();
-        int battery = Spot.getInstance().getPowerController().getVbatt();
-        Radiogram rdg = xmit.newDataPacket(PING_REPLY);
-        rdg.writeInt(linkQuality);          // report how well we can hear server
-        rdg.writeInt(corr);
-        rdg.writeInt(rssi);
-        rdg.writeInt(battery);
-        xmit.send(rdg);
-        for (int im = 0; im < stringIndex; im++) {
-            Utils.sleep(30);                // give host time to process packet
-            rdg = xmit.newDataPacket(MESSAGE_REPLY);
-            rdg.writeUTF(messages[im]);
-            xmit.send(rdg);
-            // System.out.println("Sent message: " + messages[im]);
-        }
-        stringIndex = 0;
-        Utils.sleep(200);
-    }
 
-    //Minha implementação
-    // handle probability results
-    private void sendProbabilityResult(Radiogram pkt) throws IOException
-    {
-        String myAddress = IEEEAddress.toDottedHex(pkt.getAddressAsLong());
-        Radiogram rdg = xmit.newDataPacket(REPLAY_LEACH_ENGINE);
-        rdg.writeUTF(myAddress);          // report how well we can hear server
-        rdg.writeDouble(percentage);
-        xmit.send(rdg);
-        Utils.sleep(200);
+    //Print long time pretty
+    public static String getTime(long millis) {
+        String result = "";
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(new Date(millis));
+        int year = cal.get(Calendar.YEAR);
+        int month = 1 + cal.get(Calendar.MONTH);
+        int day = cal.get(Calendar.DAY_OF_MONTH);
+        int hour = cal.get(Calendar.HOUR_OF_DAY);
+        int min = cal.get(Calendar.MINUTE);
+        int sec = cal.get(Calendar.SECOND);
+
+        result = year + "-" + ((month < 10)? "0": "") + month + "-" +
+                ((day < 10) ? "0" : "") + day + " " + hour + ":" +
+                ((min < 10) ? "0" : "") + min + ":" +
+                ((sec < 10) ? "0" : "") + sec;
+
+        return result;
     }
 
     
