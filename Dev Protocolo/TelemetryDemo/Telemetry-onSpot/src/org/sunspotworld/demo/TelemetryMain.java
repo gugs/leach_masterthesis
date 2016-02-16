@@ -473,6 +473,7 @@ public class TelemetryMain extends MIDlet
                                         currentTimeMillis()));
                                     leds.getLED(clusterHeadColor).setOff();
                                     leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
+                                    Utils.sleep(250);
                                     leds.getLED(clusterHeadColor).setOn();
                                 }
                             };
