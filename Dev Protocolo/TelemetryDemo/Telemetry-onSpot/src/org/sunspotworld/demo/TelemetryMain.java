@@ -150,6 +150,7 @@ public class TelemetryMain extends MIDlet
     private byte indexSlotTimmer = 0;
     private byte clusterLength = 0;
     private final int tdmaSlotTime = 2000;
+    private byte statusPacket = 0;
     
     /////////////////////////////////////////////////////
     //
@@ -187,7 +188,6 @@ public class TelemetryMain extends MIDlet
         led1.setRGB(50,0,0);     // Red = not active
         led1.setOn();
 
-        locator.start();            // look for host app and call serviceLocated() when found
         while (true)
         {
             Utils.sleep(30000);     // real work is done elsewhere; allow deep sleep while trying to connect
@@ -248,7 +248,7 @@ public class TelemetryMain extends MIDlet
         } catch (IOException ex) {
             System.out.println("Failed to close connection to host: " + ex);
         }
-        locator.start();
+        locator.stop();
     }
     
 
@@ -268,6 +268,8 @@ public class TelemetryMain extends MIDlet
      */
     public void handlePacket(byte type, Radiogram pkt)
     {
+        statusPacket = type;
+
         try
         {
             switch (type)
@@ -285,13 +287,16 @@ public class TelemetryMain extends MIDlet
                     isCT = false;
                     roundNumber = 0;
                     blinkLEDs();
+                    if(locator.getThreadStatus() == true)
+                        locator.forwardResetPacket();
+                    if(!(tk == null))
+                        tk.stop();
                     break;
 
                 //LEACH
                 case START_LEACH_ENGINE:
 
                     leds.setOff();
-
                     led4.setRGB(0, 100, 100);
                     led4.setOn();
                     Utils.sleep(250);
@@ -342,7 +347,6 @@ public class TelemetryMain extends MIDlet
                         locator.setStatusLed(led6);
                         locator.start();
                         clusterHeadColor = locator.getCHColor();
-
                         leds.getLED(clusterHeadColor).setOff();
                         leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
                         leds.getLED(clusterHeadColor).setOn();
@@ -406,9 +410,7 @@ public class TelemetryMain extends MIDlet
                             answerCH = (xmit.newDataPacket(JOIN_PACKET));     
                             Utils.sleep(300);
                             xmit.send(answerCH);
-                            
-                            
-                            
+                                
                             rcvrBS.stop();
 
                             if(hostConn != null)
@@ -452,6 +454,8 @@ public class TelemetryMain extends MIDlet
                            hostConn = (RadiogramConnection) Connector.open("radiogram://"+clusterHeadAddress+":"+CONNECTED_PORT);
                            hostConn.setTimeout(-1);
 
+                           rcvrBS = new PacketReceiver(hostConn);
+                           rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
                            rcvrBS.start();
 
                            Datagram dataPacket = hostConn.newDatagram(hostConn.getMaximumLength());
@@ -471,18 +475,28 @@ public class TelemetryMain extends MIDlet
                                         getRadioPolicyManager().getIEEEAddress())+
                                         ", Tempo de execucao: "+getTime(System.
                                         currentTimeMillis()));
-                                    leds.getLED(clusterHeadColor).setOff();
                                     leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
-                                    Utils.sleep(250);
                                     leds.getLED(clusterHeadColor).setOn();
+                                    Utils.sleep(250);
+                                    leds.getLED(clusterHeadColor).setOff();
+                                    System.out.println("Status: "+statusPacket+", eh CH: "+isCH);
+                                    if(statusPacket == RESET_LEACH_ENGINE && !isCH)
+                                    {
+                                        startListeningBaseStation();
+                                        System.out.println("Deveria resetar a conf");
+                                    }
+                                        
                                 }
                             };
+
                             tk.start();
+
+                            System.out.println("Oi, sou: "+IEEEAddress.toDottedHex(Spot.getInstance().getRadioPolicyManager().getIEEEAddress()));
 
                     }
                     else
                     {
-
+                           System.out.println("Aaaallooooooooooooooooooo!!!");
                     }
                     break;
                 //END LEACH
@@ -504,13 +518,6 @@ public class TelemetryMain extends MIDlet
                     led1.setOn();
                     break;
                                    
-                case REPLAY_LEACH_ENGINE:
-                    String addressCandidate = pkt.readUTF();
-                    float probabilityValue = pkt.readFloat();
-
-                    if(probabilityValue < percentage)
-                        blinkLEDs();
-                    break;
             }
         } 
         catch (IOException ex)
@@ -543,12 +550,12 @@ public class TelemetryMain extends MIDlet
     
     // handle Blink LEDs command
     private void blinkLEDs() {
-        for (int i = 0; i < 10; i++) {          // blink LEDs 10 times = 10 seconds
+        for (int i = 0; i < 4; i++) {          // blink LEDs 10 times = 10 seconds
             leds.setColor(LEDColor.MAGENTA);
             leds.setOn();
             Utils.sleep(250);
             leds.setOff();
-            Utils.sleep(750);
+            Utils.sleep(250);
         }
     }
 

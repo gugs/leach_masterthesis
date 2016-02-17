@@ -62,7 +62,7 @@ public abstract class PeriodicTask extends Resource implements IService {
     protected int status = STOPPED;
     protected Thread thread = null;
     private String name = "Periodic Task Execution";
-    protected int priority = Thread.NORM_PRIORITY;
+    protected int priority = Thread.MIN_PRIORITY;
     protected IAT91_TC timer = null;
     
     /**

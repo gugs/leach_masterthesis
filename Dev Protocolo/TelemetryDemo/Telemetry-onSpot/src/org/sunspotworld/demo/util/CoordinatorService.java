@@ -112,6 +112,13 @@ public class CoordinatorService implements PacketTypes{
     {
         return ledColor;
     }
+
+    public boolean getThreadStatus ()
+    {
+        if(thread == null)
+            return false;
+        return true;
+    }
  
     /**
      * Specify an LED to use to display status of search.
@@ -183,6 +190,24 @@ public class CoordinatorService implements PacketTypes{
             ex.printStackTrace();
         }
         return xdg;
+    }
+
+    public void forwardResetPacket() throws IOException
+    {
+        RadiogramConnection txConn = null;
+        Datagram newDg = null;
+        
+            for(int i = 0; i < addressNodes.size(); i++)
+            {
+                txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
+                newDg = txConn.newDatagram(txConn.getMaximumLength());
+                newDg.writeByte(RESET_LEACH_ENGINE);
+                txConn.send(newDg);
+                System.out.println("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT+"\nReset da aplicação!");
+            }
+
+        
+        
     }
 
     /**
@@ -303,7 +328,9 @@ public class CoordinatorService implements PacketTypes{
                        }
                        
                    }
-
+                   txConn.close();
+                   rcvConn.close();
+                   
                    System.out.println("Entrei no loop do coordenador 8");
                    //problema de sincronismo de tempo
                 }
@@ -316,5 +343,6 @@ public class CoordinatorService implements PacketTypes{
                     
                 }
     }
+
 
 }
