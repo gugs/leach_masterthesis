@@ -27,6 +27,7 @@ import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.TimeoutException;
+import com.sun.spot.util.IEEEAddress;
 import com.sun.spot.util.Utils;
 import java.io.IOException;
 import java.util.Random;
@@ -196,15 +197,23 @@ public class CoordinatorService implements PacketTypes{
     {
         RadiogramConnection txConn = null;
         Datagram newDg = null;
-
+        
             System.out.println("Tamanho do vetor de reset: "+addressNodes.size());
             for(int i = 0; i < addressNodes.size(); i++)
             {
-                txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
-                newDg = txConn.newDatagram(txConn.getMaximumLength());
-                newDg.writeByte(RESET_LEACH_ENGINE);
-                txConn.send(newDg);
-                System.out.println("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT+"\nReset da aplicação!");
+                try {
+                    System.out.println("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT+"\nReset Iniciado!");
+                    txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
+                    newDg = txConn.newDatagram(txConn.getMaximumLength());
+                    newDg.writeByte(RESET_LEACH_ENGINE);
+                    txConn.send(newDg);
+                    txConn.close();
+
+                    System.out.println("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT+"\nReset da aplicação!");
+                } catch (Exception e) {
+                    System.out.println(IEEEAddress.toDottedHex(ourMacAddress) + "-:-"+e.getMessage());
+                }
+                
             }
 
         
@@ -228,7 +237,8 @@ public class CoordinatorService implements PacketTypes{
 
             now = 0L;
 
-            Utils.sleep(200);  // wait a bit to give any previously running instance a chance to exit
+            Utils.sleep(200);
+            // wait a bit to give any previously running instance a chance to exit
             // this outer loop is for retrying if there is an exception
 
                 try
@@ -240,9 +250,10 @@ public class CoordinatorService implements PacketTypes{
                     led.setOff();
                     led.setRGB(255,255,100);                // Yellow = looking for display server
                     led.setOn();
-                    Utils.sleep(2000);
 
-                    System.out.println("Entrei no loop do coordenador 2");
+
+                   System.out.println("Entrei no loop do coordenador 2");
+
                    if (led != null)
                    {
                       led.setRGB(ledColor,40,0);                // Yellow = looking for display server
@@ -251,13 +262,17 @@ public class CoordinatorService implements PacketTypes{
 
                    xdg = writeCoordinatorAddressInHeader(ADV_PACKET, xdg,
                            ourMacAddress, ledColor);
+
                    led.setOff();
                    led.setRGB(0, 100, 100);
                    led.setOn();
-                   Utils.sleep(500);
+                   
                    txConn.send(xdg);
-
-                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:" + CONNECTED_PORT);
+                   Utils.sleep(250);
+                   //txConn.close();
+                   
+                   rcvConn = (RadiogramConnection)Connector.open("radiogram://:"
+                           + CONNECTED_PORT);
 
                    //rcvConn.setTimeout(300);    // timeout in 300 msec - so receive() will not deep sleep
                    Radiogram rdg = (Radiogram)rcvConn.newDatagram(rcvConn.getMaximumLength());
@@ -270,7 +285,6 @@ public class CoordinatorService implements PacketTypes{
                    led.setRGB(0, 255, 0);
                    led.setOn();
                    //Utils.sleep(300);
-
 
                    while((System.currentTimeMillis() - now < timeOut) )
                    {     
@@ -303,9 +317,9 @@ public class CoordinatorService implements PacketTypes{
                         }
                    }
 
-                            led.setOff();
-                            led.setRGB(255, 255, 0);
-                            led.setOn();
+                    led.setOff();
+                    led.setRGB(255, 255, 0);
+                    led.setOn();
 
                    System.out.println("Entrei no loop do coordenador 6");
                    System.out.println("Outside Vector size: "+addressNodes.size());
@@ -318,13 +332,13 @@ public class CoordinatorService implements PacketTypes{
 
                        if(txConn != null && thread == Thread.currentThread())
                        {
-                           txConn.close();
                            txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
                            Datagram newDg = txConn.newDatagram(txConn.getMaximumLength());
                            newDg.writeByte(TDMA_PACKET);
                            newDg.writeByte(addressNodes.indexOf(addressNodes.elementAt(i)));
                            newDg.writeByte(addressNodes.size());
                            txConn.send(newDg);
+                           txConn.close();
                            System.out.println("Entrei no loop do coordenador 7");
                        }
                        

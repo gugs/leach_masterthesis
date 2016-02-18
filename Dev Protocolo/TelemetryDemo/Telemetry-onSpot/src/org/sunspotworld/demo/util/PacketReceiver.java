@@ -58,22 +58,24 @@ public class PacketReceiver extends Resource implements IService {
      *
      * @param conn the radiogram connection to receive packets from
      */
-    public PacketReceiver(RadiogramConnection conn) {
+    public PacketReceiver(RadiogramConnection conn)
+    {
         registeredHandlers = new Vector[256];
-        for (int x = 0 ; x < 256 ; x++) {
+        for (int x = 0 ; x < 256 ; x++)
+        {
             registeredHandlers[x] = new Vector();
         }
         rcvConn = conn;
-        //rcvConn.setRadioPolicy(RadioPolicy.AUTOMATIC);
     }
 
-    public void setNewConnectionc(RadiogramConnection conn) {
+    public void setNewConnectionc(RadiogramConnection conn)
+    {
         registeredHandlers = new Vector[256];
-        for (int x = 0 ; x < 256 ; x++) {
+        for (int x = 0 ; x < 256 ; x++)
+        {
             registeredHandlers[x] = new Vector();
         }
         rcvConn = conn;
-        //rcvConn.setRadioPolicy(RadioPolicy.AUTOMATIC);
     }
     
     /**
@@ -83,7 +85,8 @@ public class PacketReceiver extends Resource implements IService {
      * @param handler the class to register
      * @param type the command to dispatch to this handler
      */
-    public synchronized void registerHandler(PacketHandler handler, byte type){
+    public synchronized void registerHandler(PacketHandler handler, byte type)
+    {
         if (!registeredHandlers[type].contains(handler)) {
             registeredHandlers[type].addElement(handler);
         }        
@@ -95,7 +98,8 @@ public class PacketReceiver extends Resource implements IService {
      * @param handler the class to unregister
      * @param type the command to not dispatch to this handler
      */
-    public synchronized void unregisterHandler(PacketHandler handler , byte type){
+    public synchronized void unregisterHandler(PacketHandler handler, byte type)
+    {
         registeredHandlers[type].removeElement(handler);
     }
 
@@ -104,8 +108,10 @@ public class PacketReceiver extends Resource implements IService {
      *
      * @param handler the class to unregister
      */
-    public synchronized void unregisterHandler(PacketHandler handler){
-        for (int i = 0; i < 256; i++) {
+    public synchronized void unregisterHandler(PacketHandler handler)
+    {
+        for (int i = 0; i < 256; i++)
+        {
             registeredHandlers[i].removeElement(handler);
         }        
     }
@@ -114,48 +120,71 @@ public class PacketReceiver extends Resource implements IService {
      * Main loop of the packet receiver.  Receive packets and dispatch them to 
      * all handlers that have asked to see that type of packet.
      */
-    private void receiverLoop() {
-        try {
+    private void receiverLoop()
+    {
+        try
+        {
             Radiogram rdg = (Radiogram)rcvConn.newDatagram(rcvConn.getMaximumLength());
             
             // continually receive the next packet
             status = RUNNING;
             
-            while (status == RUNNING && thread == Thread.currentThread()) {
+            while (status == RUNNING && thread == Thread.currentThread())
+            {
                 try
                 {
                     rcvConn.receive(rdg);
                     byte packetType = rdg.readByte();
-                    synchronized (this) { // we don't allow new handlers to be added in this section
+                    synchronized (this)
+                    { // we don't allow new handlers to be added in this section
                         Vector handlers = registeredHandlers[packetType];
-                        if (handlers.size() == 0) {
-                            System.out.println("ignoring packet type: " + packetType);
-                        } else {
-                            for (Enumeration e = handlers.elements() ; e.hasMoreElements() ;) {
-                                try {
+                        if (handlers.size() == 0)
+                        {
+                            System.out.println("ignoring packet type: "
+                                    + packetType);
+                        } 
+                        else
+                        {
+                            for (Enumeration e = handlers.elements();
+                                                        e.hasMoreElements() ;)
+                            {
+                                try
+                                {
                                     rdg.resetRead();
                                     rdg.readByte();
-                                    ((PacketHandler)e.nextElement()).handlePacket(packetType,rdg);
-                                } catch (Exception ex) {            // don't let an error kill the server!!!
-                                    System.out.println("Error handling packet of type " + packetType + ": " + ex);
+                                    ((PacketHandler)e.nextElement()).
+                                            handlePacket(packetType,rdg);
+                                }
+                                catch (Exception ex)
+                                {
+                                    // don't let an error kill the server!!!
+                                    System.out.println("Error handling packet of"
+                                          +" type:: " + packetType + ": " + ex);
                                     ex.printStackTrace();
                                 }
                             }
                         }
                     }
-                } catch (InterruptedIOException iex) {
+                } 
+                catch (InterruptedIOException iex)
+                {
                     System.out.println("Packet receiver " + name + ": " + iex);
                     break;
-                } catch (IOException ex) {
+                } 
+                catch (IOException ex)
+                {
                     /* ignore */
                     System.out.println("Error in packet receiver " + name + ": " + ex);
                     // XXX should we try to recover?
                 }
             }
-        } catch (Exception e) {
+        } 
+        catch (Exception e)
+        {
             System.out.println("Fatal error in packet receiver " + name + ": " + e);
         }
-        if (thread == Thread.currentThread()) {
+        if (thread == Thread.currentThread())
+        {
             status = STOPPED;
         }
     }

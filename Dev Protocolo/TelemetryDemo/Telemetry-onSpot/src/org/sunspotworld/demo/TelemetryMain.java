@@ -153,6 +153,7 @@ public class TelemetryMain extends MIDlet
     private byte statusPacket = 0;
     private Datagram dataPacket;
     private boolean resetStatus = false;
+    private boolean flagTDMA = false;
     
     /////////////////////////////////////////////////////
     //
@@ -174,26 +175,7 @@ public class TelemetryMain extends MIDlet
         // create a service locator using the correct port & connection commands
         locator = new CoordinatorService();
 
-        //locator.stop();
-
-        //locator.setStatusLed(led2);
-
         stringIndex = 0;
-    }
-    
-    /**
-     * Main application run loop.
-     */
-    public void run()
-    {
-        System.out.println("Spot acceleration telemetry recorder  (version " + VERSION + ")");
-        led1.setRGB(50,0,0);     // Red = not active
-        led1.setOn();
-
-        while (true)
-        {
-            Utils.sleep(30000);     // real work is done elsewhere; allow deep sleep while trying to connect
-        }
     }
 
 
@@ -288,21 +270,23 @@ public class TelemetryMain extends MIDlet
                     
                     if(!resetStatus)
                     {
-
-                        isCH = false;
-                        isCT = false;
                         roundNumber = 0;
-                        if(tk != null)
+                        if(tk != null && !isCH)
                             tk.stop();
                         blinkLEDs();
-                        locator.forwardResetPacket();
-
-//                        if(locator.getThreadStatus() == true)
-//                            locator.forwardResetPacket();
-//                        if(!(tk == null))
-//                            tk.stop();
+                        if(isCH){
+                            locator.forwardResetPacket();
+                            startListeningBaseStation();
+                        }else
+                        {
+                            System.out.println("Deveria resetar a conf");
+                        }
+                            
+                        isCH = false;
+                        isCT = false;
                     }
                     resetStatus = true;
+                    
                     break;
 
                 //LEACH
@@ -332,6 +316,7 @@ public class TelemetryMain extends MIDlet
 
                     if(isCH)
                     {
+                        locator.stop();
                         isCH = false;
                         isCT = true;
                     }
@@ -354,8 +339,6 @@ public class TelemetryMain extends MIDlet
                     }
                     if(randomNumber<probability)
                     {
-                        //ajustar timer
-                        //enviar mensagem de ADV
                         isCH = true;
                         locator.setStatusLed(led6);
                         locator.start();
@@ -366,10 +349,6 @@ public class TelemetryMain extends MIDlet
 
                         //blinkLEDs();
                     }
-                    else
-                    {
-                        locator.stop();
-                    }
                     
                     //setTimer(START_ROUND, roundLenght);
                     roundNumber++;
@@ -379,13 +358,16 @@ public class TelemetryMain extends MIDlet
 
                 case ADV_PACKET:
 
+                    flagTDMA = false;
                     if(!isCH)
                     {
                         if(maxRssiCoordinator < pkt.getRssi())
                         {
                             maxRssiCoordinator = pkt.getRssi();
 
-                            System.out.println("Aqui vc tem de entrar de todo jeito!");
+                            System.out.println("Recebimento do ADV por parte "
+                                    + "do CH!");
+
                             for(int i = 1; i < 5; i++)
                             {
                                 leds.getLED(i).setOff();
@@ -399,7 +381,12 @@ public class TelemetryMain extends MIDlet
                             leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
                             leds.getLED(clusterHeadColor).setOn();
                             clusterHeadAddress = IEEEAddress.toDottedHex(address);
-                            System.out.println("Endereco: radiogram://"+clusterHeadAddress+":"+CONNECTED_PORT);
+                            System.out.println("Endereco do CH eleito: radiogram"
+                                    + "://"+clusterHeadAddress+":"
+                                    +CONNECTED_PORT+", por: "+IEEEAddress.
+                                    toDottedHex(Spot.
+                                    getInstance().getRadioPolicyManager().
+                                    getIEEEAddress()));
                             
                             rcvrBS.stop();
 
@@ -433,6 +420,8 @@ public class TelemetryMain extends MIDlet
                             hostConn = (RadiogramConnection) Connector.open("radiogram://:"+CONNECTED_PORT);
                             rcvrBS = new PacketReceiver(hostConn);
                             rcvrBS.registerHandler(this, TDMA_PACKET);
+                            rcvrBS.registerHandler(this, DATA_PACKET);
+                            rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
                             rcvrBS.start();
                             System.out.println("Aguardadndo recebimento de pacotes");
                             
@@ -440,7 +429,9 @@ public class TelemetryMain extends MIDlet
                     }
                     else
                     {
-                        rcvrBS.registerHandler(this, DATA_PACKET);
+                            rcvrBS.registerHandler(this, TDMA_PACKET);
+                            rcvrBS.registerHandler(this, DATA_PACKET);
+                            rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
                     }
                     break;
 
@@ -451,8 +442,8 @@ public class TelemetryMain extends MIDlet
                     indexSlotTimmer = (pkt.readByte());
                     indexSlotTimmer++;
                     clusterLength = pkt.readByte();
-                    System.out.println("Opa, sou: "+pkt.getAddress()+", "
-                            + "e recebi"
+                    System.out.println("Opa, sou: "+ IEEEAddress.toDottedHex( Spot.getInstance().getRadioPolicyManager().getIEEEAddress())   +", "
+                            + "e recebi de "+pkt.getAddress()+", "
                             + "o pacote TDMA com os seguintes dados:\n "
                             + "-IndexSlotTimmer: "
                             +indexSlotTimmer+"\n -ClusterLength: "+
@@ -461,8 +452,9 @@ public class TelemetryMain extends MIDlet
 
                     //segunda parte do codigo com alteracoes
 
-                    if(!isCH)
+                    if(!isCH && !flagTDMA)
                     {
+                           flagTDMA = true;
                            rcvrBS.stop();
                            xmit.stop();
 
@@ -516,7 +508,6 @@ public class TelemetryMain extends MIDlet
                                     {
                                         rcvrBS.stop();
                                         startListeningBaseStation();
-                                        rcvrBS.start();
                                         System.out.println("Deveria resetar a conf");
                                     }
 
@@ -592,8 +583,10 @@ public class TelemetryMain extends MIDlet
 
     
     // handle Blink LEDs command
-    private void blinkLEDs() {
-        for (int i = 0; i < 4; i++) {          // blink LEDs 10 times = 10 seconds
+    private void blinkLEDs()
+    {
+        for (int i = 0; i < 4; i++)
+        {          // blink LEDs 10 times = 10 seconds
             leds.setColor(LEDColor.MAGENTA);
             leds.setOn();
             Utils.sleep(250);
@@ -617,16 +610,6 @@ public class TelemetryMain extends MIDlet
         }
     }
 
-    private float calculateProbability()
-    {
-        led4.setRGB(10, 10, 10);
-        led4.setOn();
-        Utils.sleep(2000);
-        led4.setOff();
-        return (PERCENTAGE_CLUSTER_HEAD /1-PERCENTAGE_CLUSTER_HEAD*
-                (roundNumber%(1/PERCENTAGE_CLUSTER_HEAD)));
-    }
-
 
     //////////////////////////////////////////////////////////
     //
@@ -637,16 +620,17 @@ public class TelemetryMain extends MIDlet
     /**
      * MIDlet call to start our application.
      */
-    protected void startApp() throws MIDletStateChangeException {
+    protected void startApp() throws MIDletStateChangeException
+    {
         BootloaderListenerService.getInstance().start();       // Listen for downloads/commands over USB connection
         ISwitch sw1 = (ISwitch) Resources.lookup(ISwitch.class, "sw1");
         sw1.addISwitchListener(this);
         initialize();
+
         while(true)
         {
             Utils.sleep(30000);
         }
-        //run();
     }
 
     /**
