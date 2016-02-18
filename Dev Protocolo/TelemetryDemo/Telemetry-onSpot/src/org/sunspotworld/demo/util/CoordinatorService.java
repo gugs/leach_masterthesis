@@ -192,11 +192,12 @@ public class CoordinatorService implements PacketTypes{
         return xdg;
     }
 
-    public void forwardResetPacket() throws IOException
+    public synchronized void forwardResetPacket() throws IOException
     {
         RadiogramConnection txConn = null;
         Datagram newDg = null;
-        
+
+            System.out.println("Tamanho do vetor de reset: "+addressNodes.size());
             for(int i = 0; i < addressNodes.size(); i++)
             {
                 txConn = (RadiogramConnection) Connector.open("radiogram://"+(String)addressNodes.elementAt(i)+":"+CONNECTED_PORT);
@@ -328,8 +329,10 @@ public class CoordinatorService implements PacketTypes{
                        }
                        
                    }
-                   txConn.close();
-                   rcvConn.close();
+                   
+                   //txConn.close();
+                   //rcvConn.close();
+
                    
                    System.out.println("Entrei no loop do coordenador 8");
                    //problema de sincronismo de tempo
