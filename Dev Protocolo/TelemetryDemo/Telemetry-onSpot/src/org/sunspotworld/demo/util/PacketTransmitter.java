@@ -101,6 +101,11 @@ public class PacketTransmitter extends Resource implements IService {
         this.payloadSize = payloadSize;
         init();
     }
+
+    public void setRadiogramConnection(RadiogramConnection conn)
+    {
+        this.txConn = conn;
+    }
     
     /**
      * Initialize the free & transmit queues. Preallocate datagrams.
@@ -270,7 +275,7 @@ public class PacketTransmitter extends Resource implements IService {
                 }
             }
             status = STARTING;
-            thread = new Thread() {
+            thread = new Thread("Thread Transmitter") {
                 public void run() {
                     transmitLoop();
                 }

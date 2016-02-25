@@ -297,7 +297,7 @@ public abstract class PeriodicTask extends Resource implements IService {
     public boolean start() {
         if (status == STOPPED || status == STOPPING) {
             status = STARTING;
-            thread = new Thread() {
+            thread = new Thread("Thread Periodic Task") {
                 public void run() {
                     runTask();
                 }

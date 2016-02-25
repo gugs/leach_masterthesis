@@ -56,6 +56,8 @@ public interface PacketTypes {
 
     public static final byte JOIN_PACKET = 7;
 
+    public static final byte AGGREGATE_PACKET = 8;
+
     /** Host command to ping the remote SPOT and get the radio signal strength. */
     public static final byte PING_REQ                   = 9;
     /** Host command to blink the remote SPOT's LEDs. */
@@ -84,5 +86,7 @@ public interface PacketTypes {
     
     /** Cluster Head Percentual*/
     public static final float PERCENTAGE_CLUSTER_HEAD = (float) 0.2;
+
+    public static final int timeOutDataPacket = 30000;
 
 }

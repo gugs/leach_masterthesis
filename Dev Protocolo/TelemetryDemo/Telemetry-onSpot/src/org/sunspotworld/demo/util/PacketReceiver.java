@@ -26,6 +26,7 @@ import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.resources.Resource;
 import com.sun.spot.service.IService;
+import com.sun.spot.util.IEEEAddress;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Enumeration;
@@ -68,13 +69,8 @@ public class PacketReceiver extends Resource implements IService {
         rcvConn = conn;
     }
 
-    public void setNewConnectionc(RadiogramConnection conn)
+    public void setRadiogramConnection(RadiogramConnection conn)
     {
-        registeredHandlers = new Vector[256];
-        for (int x = 0 ; x < 256 ; x++)
-        {
-            registeredHandlers[x] = new Vector();
-        }
         rcvConn = conn;
     }
     
@@ -159,7 +155,10 @@ public class PacketReceiver extends Resource implements IService {
                                 {
                                     // don't let an error kill the server!!!
                                     System.out.println("Error handling packet of"
-                                          +" type:: " + packetType + ": " + ex);
+                                          +" type:: " + packetType + ": from "+
+                                          IEEEAddress.
+                                          toDottedHex(rdg.getAddressAsLong())+
+                                          ex);
                                     ex.printStackTrace();
                                 }
                             }
@@ -217,7 +216,7 @@ public class PacketReceiver extends Resource implements IService {
     public boolean start() {
         if (status == STOPPED || status == STOPPING) {
             status = STARTING;
-            thread = new Thread() {
+            thread = new Thread("Thread Receiver") {
                 public void run() {
                     receiverLoop();
                 }
