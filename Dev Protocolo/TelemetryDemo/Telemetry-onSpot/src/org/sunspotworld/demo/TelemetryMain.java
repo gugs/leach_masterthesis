@@ -48,11 +48,9 @@ import com.sun.spot.util.Queue;
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.EmptyStackException;
 import java.util.Random;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
-
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 import org.sunspotworld.demo.util.Aggregator;
@@ -113,22 +111,14 @@ import org.sunspotworld.demo.util.Aggregator;
 public class TelemetryMain extends MIDlet
         implements  PacketHandler, PacketTypes , ISwitchListener
 {
-
-    private PeriodicTask tk;
-    
     private boolean connected = false;
-    private String messages[] = new String[50];
-    private int stringIndex = 0;
     private Random r;
-    
     private CoordinatorService locator;
     private PacketReceiver rcvr;
     private PacketReceiver rcvrBS;
     private PacketTransmitter xmit;
     private RadiogramConnection hostConn;
     private Aggregator aggregator;
-
-    //private AccelMonitor accelMonitor = null;
 
     private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.
             lookup(ITriColorLEDArray.class);
@@ -139,11 +129,10 @@ public class TelemetryMain extends MIDlet
     private ITriColorLED led7 = leds.getLED(6);
     private ITriColorLED led8 = leds.getLED(7);
 
-    //leach variables
+    //LEACH Variables
 
     private double randomNumber = 0.0;
     private byte roundNumber = 0;
-    private double percentage = 0.1;
     private double probability = 0;
     private boolean isCH = false;
     private boolean isCT = false;
@@ -153,14 +142,11 @@ public class TelemetryMain extends MIDlet
     private byte indexSlotTimmer = 0;
     private byte clusterLength = 0;
     private final int tdmaSlotTime = 20000;
-    private byte statusPacket = 0;
     private Datagram dataPacket;
     private boolean resetStatus = false;
     private boolean flagTDMA = false;
     private int mean = 0;
-    private int dataPacketCount = 0;
     private boolean dataPacketPhase = true;
-    private boolean dataPacketAlreadySent = false;
     private Queue dataIncoming;
     
     /////////////////////////////////////////////////////
@@ -185,7 +171,6 @@ public class TelemetryMain extends MIDlet
         // create a service locator using the correct port & connection commands
         locator = new CoordinatorService();
 
-        stringIndex = 0;
     }
 
 
@@ -200,15 +185,13 @@ public class TelemetryMain extends MIDlet
         locator = new CoordinatorService();
 
         try
-        {
-            
+        {           
             if(rcvrBS == null)
             {
                 System.out.println("Nova instância de Radiogram criada...");
                 hostConn = (RadiogramConnection) Connector.open("radiogram://:"
                         +BROADCAST_PORT);
                 rcvrBS = new PacketReceiver(hostConn);
-                // set up thread to receive & dispatch commands
             }
             else
             {
@@ -226,7 +209,7 @@ public class TelemetryMain extends MIDlet
         }
 
             rcvrBS.setServiceName("Base Station Command Server");
-            rcvrBS.registerHandler(this, START_APP);     // specify commands this class handles
+            rcvrBS.registerHandler(this, START_APP);
             rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
             rcvrBS.registerHandler(this, START_LEACH_ENGINE);
             rcvrBS.registerHandler(this, STOP_LEACH_ENGINE);
@@ -235,7 +218,6 @@ public class TelemetryMain extends MIDlet
             rcvrBS.registerHandler(this, TDMA_PACKET);
             rcvrBS.registerHandler(this, DATA_PACKET);
             rcvrBS.start();
-            
     }
 
 
@@ -282,8 +264,6 @@ public class TelemetryMain extends MIDlet
      */
     public void handlePacket(byte type, Radiogram pkt)
     {
-        statusPacket = type;
-
         try
         {
             switch (type)
@@ -301,8 +281,6 @@ public class TelemetryMain extends MIDlet
                     if(!resetStatus)
                     {
                         roundNumber = 0;
-                        if(tk != null && !isCH)
-                            tk.stop();
                         blinkLEDs();
                         if(isCH)
                         {
@@ -341,14 +319,12 @@ public class TelemetryMain extends MIDlet
                     led4.setOn();
                     Utils.sleep(250);
                     led4.setOff();
-
                     led7.setOff();
                     led8.setOff();
-
                     maxRssiCoordinator = 0;
                     led8.setOff();
 
-                    if(roundNumber >= 1/percentage)
+                    if(roundNumber >= 1/PERCENTAGE_CLUSTER_HEAD)
                     {
                         roundNumber = 0;
                         isCH = false;
@@ -370,17 +346,20 @@ public class TelemetryMain extends MIDlet
                     }
                     else
                     {
-                        if(roundNumber >= (1/percentage - 1))
+                        if(roundNumber >= (1/PERCENTAGE_CLUSTER_HEAD - 1))
                         {
                             probability = 1;
                         }
                         else
                         {
-                            probability = percentage/(1-percentage*
-                                    (roundNumber % (int)(1/percentage)));
+                            probability = PERCENTAGE_CLUSTER_HEAD
+                                    /(1-PERCENTAGE_CLUSTER_HEAD*
+                                    (roundNumber % 
+                                    (int)(1/PERCENTAGE_CLUSTER_HEAD)));
                         }
 
                     }
+
                     if(randomNumber<probability)
                     {
                         isCH = true;
@@ -391,7 +370,7 @@ public class TelemetryMain extends MIDlet
                         leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
                         leds.getLED(clusterHeadColor).setOn();
                     }
-                    System.out.println("Esse nó é um CH? "+isCH+", O serviço de "
+                    System.out.println("Is this a CH? "+isCH+", O serviço de "
                             + "recebimento de pacotes está rodando?" 
                             +rcvrBS.isRunning());
 
@@ -593,7 +572,7 @@ public class TelemetryMain extends MIDlet
                             +pkt.getAddress());
 
                     if((System.currentTimeMillis()-pkt.getTimestamp()) <
-                            timeOutDataPacket)
+                            TIMEOUT_DATA_PACKET)
                     {
                            pkt.resetRead();
                            aggregator.addDataPacketInQueue(Integer.valueOf(10));
@@ -709,21 +688,6 @@ public class TelemetryMain extends MIDlet
             Utils.sleep(250);
             leds.setOff();
             Utils.sleep(250);
-        }
-    }
-
-    /**
-     * Add a message to the queue to be sent to the host at a later time. 
-     * Messages will be sent after the next Ping request arrives.
-     *
-     * @param msg the String to be sent
-     */
-    public void queueMessage (String msg) {
-        if (stringIndex < messages.length) {
-            messages[stringIndex++] = (msg.length() < Radiogram.MAX_LENGTH) ? msg : msg.substring(0, Radiogram.MAX_LENGTH - 1);
-            // System.out.println("Queuing message: " + msg);
-        } else {
-            // System.out.println("No room in queue for message: " + msg);
         }
     }
 
