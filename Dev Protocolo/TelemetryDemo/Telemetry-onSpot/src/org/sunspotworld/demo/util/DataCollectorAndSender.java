@@ -13,13 +13,13 @@ import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.util.Utils;
 import java.io.IOException;
 import javax.microedition.io.Datagram;
-import org.sunspotworld.demo.PacketTypes;
+import org.sunspotworld.demo.PacketType;
 
 /**
  *
  * @author USUARIO
  */
-public class DataCollectorAndSender extends PeriodicTask implements PacketTypes
+public class DataCollectorAndSender extends PeriodicTask implements PacketType
 {
     private PacketTransmitter xmit;
     private long startTime;

@@ -142,18 +142,25 @@ public class PacketTransmitter extends Resource implements IService {
      * @param type the type of data packet to send
      * @return the data packet with its header setup
      */
-    public Radiogram newDataPacket(byte type) {
-        for (int i = 0; i < 5; i++) {
+    public Radiogram newDataPacket(byte type, byte packetSize)
+    {
+        for (int i = 0; i < 5; i++)
+        {
             try {
                 Radiogram dg = null;
-                if (freeQueue.isEmpty()) {
-                    dg = (Radiogram)txConn.newDatagram(MAX_PAYLOAD_SIZE);
-                } else {
+                if (freeQueue.isEmpty())
+                {
+                    dg = (Radiogram)txConn.newDatagram(packetSize);
+                }
+                else
+                {
                     dg = (Radiogram)freeQueue.get();
                 }
                 writeHeader(dg, type);
                 return dg;
-            } catch (IOException ex) {
+            } 
+            catch (IOException ex)
+            {
                 // retry, let dg be reclaimed as garbage
             }
         }

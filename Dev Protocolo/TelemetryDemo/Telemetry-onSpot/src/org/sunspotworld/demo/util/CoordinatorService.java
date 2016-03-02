@@ -28,14 +28,13 @@ import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.TimeoutException;
 import com.sun.spot.util.IEEEAddress;
-import com.sun.spot.util.Queue;
 import com.sun.spot.util.Utils;
 import java.io.IOException;
 import java.util.Random;
 import java.util.Vector;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
-import org.sunspotworld.demo.PacketTypes;
+import org.sunspotworld.demo.PacketType;
 import org.sunspotworld.demo.TelemetryMain;
 
 /**
@@ -53,7 +52,7 @@ import org.sunspotworld.demo.TelemetryMain;
  */
 
 
-public class CoordinatorService implements PacketTypes
+public class CoordinatorService implements PacketType
 {
     
     private long ourMacAddress;
@@ -136,7 +135,7 @@ public class CoordinatorService implements PacketTypes
     {
 
         
-        thread = new Thread("Coordinator") {
+        thread = new Thread("Coordinator Node") {
             public void run() {
                 coordinatorLoop();
             }
@@ -182,29 +181,37 @@ public class CoordinatorService implements PacketTypes
         RadiogramConnection txConn = null;
         Datagram newDg = null;
         
-            System.out.println("Tamanho do vetor dos nós subordinados ao CH"
-                    +": "+addressNodes.size());
+        System.out.println(TelemetryMain.getTime(System.
+                currentTimeMillis())+", node: "+IEEEAddress.
+                toDottedHex(Spot.getInstance().
+                getRadioPolicyManager().getIEEEAddress())+
+                "Vector size of non-CH nodes that adopted to this CH: "
+                +addressNodes.size());
+
             for(int i = 0; i < addressNodes.size(); i++)
             {
                 try
-                {
-                    
+                {        
                     txConn = (RadiogramConnection) Connector.open("radiogram://"
                             +(String)addressNodes.elementAt(i)+
                             ":"+CONNECTED_PORT);
-                    newDg = txConn.newDatagram(txConn.getMaximumLength());
+                    newDg = txConn.newDatagram(OPERATING_LEACH_PACKET_SIZE);
                     newDg.writeByte(RESET_LEACH_ENGINE);
                     txConn.send(newDg);
                     txConn.close();
 
-                    System.out.println("Endereco de destino do Reset_Packet: "
+                    System.out.println(TelemetryMain.getTime(System.
+                        currentTimeMillis())+", node: "+IEEEAddress.
+                        toDottedHex(Spot.getInstance().
+                        getRadioPolicyManager().getIEEEAddress())+
+                        " Destination address of Reset_Packet: "
                             + "\nradiogram://"+(String)addressNodes.elementAt(i)
-                            +":"+CONNECTED_PORT+"\nReset da aplicação!");
+                            +":"+CONNECTED_PORT+"\n\t-Application reset!");
                 }
                 catch (Exception e)
                 {
-                    System.out.println("Erro no envio do Reset_Packet enviado"
-                            + " por: "+IEEEAddress.toDottedHex(ourMacAddress)
+                    System.out.println("Erro to send Reset_Packet by: "
+                            +IEEEAddress.toDottedHex(ourMacAddress)
                             + "-:-"+e.getMessage());
                 }   
             }
@@ -216,7 +223,11 @@ public class CoordinatorService implements PacketTypes
      */
     private void coordinatorLoop ()
     {
-            System.out.println("Início dos passos a serem executados pelo CH");
+            System.out.println(TelemetryMain.getTime(System.
+                currentTimeMillis())+", node: "+IEEEAddress.
+                toDottedHex(Spot.getInstance().
+                getRadioPolicyManager().getIEEEAddress())+
+                " Starting steps to be performed by CH.");
 
             led.setOff();
             led.setRGB(ledColor,40,100);
@@ -235,15 +246,19 @@ public class CoordinatorService implements PacketTypes
                    
                    txConn = (RadiogramConnection) Connector.
                            open("radiogram://broadcast:" + BROADCAST_PORT);
-                   Datagram xdg = txConn.newDatagram(20);
+                   Datagram xdg = txConn.newDatagram(ADV_PACKET_SIZE);
 
                     led.setOff();
                     led.setRGB(255,255,100);
                     led.setOn();
 
 
-                   System.out.println("Radiogram estabelecido em broadcast"
-                           + " com sucesso!");
+                   System.out.println(TelemetryMain.getTime(System.
+                           currentTimeMillis())+", node: "+IEEEAddress.
+                           toDottedHex(Spot.getInstance().
+                           getRadioPolicyManager().getIEEEAddress())+
+                           " ADV-Radiogram broadcast send connection"
+                           + "stablished with success!");
 
                    if (led != null)
                    {
@@ -265,13 +280,17 @@ public class CoordinatorService implements PacketTypes
                    rcvConn = (RadiogramConnection)Connector.open("radiogram://:"
                            + CONNECTED_PORT);
 
-                   Radiogram rdg = (Radiogram)rcvConn.newDatagram(rcvConn.
-                           getMaximumLength());
+                   Radiogram rdg = (Radiogram)rcvConn.
+                           newDatagram(JOIN_PACKET_SIZE);
 
                    now = System.currentTimeMillis();
 
-                   System.out.println("Radiogram estabelecido em server "
-                           + "broadcast com sucesso!");
+                   System.out.println(TelemetryMain.getTime(System.
+                           currentTimeMillis())+", node: "+IEEEAddress.
+                           toDottedHex(Spot.getInstance().
+                           getRadioPolicyManager().getIEEEAddress())+
+                           " JOIN-Radiogram broadcast receive "
+                           + "connection stablished with success!");
 
                    led.setOff();
                    led.setRGB(0, 255, 0);
@@ -283,8 +302,12 @@ public class CoordinatorService implements PacketTypes
                         try
                         {
                             rcvConn.setTimeout(500);
-                            System.out.println("Recebimento dos JOINS "
-                                    + "iniciado!");
+
+                            System.out.println(TelemetryMain.getTime(System.
+                                    currentTimeMillis())+", node: "+IEEEAddress.
+                                    toDottedHex(Spot.getInstance().
+                                    getRadioPolicyManager().getIEEEAddress())
+                                    +" JOINS receiving started!");
                             rcvConn.receive(rdg);
                         }
                         catch(TimeoutException e)
@@ -301,61 +324,86 @@ public class CoordinatorService implements PacketTypes
                             led.setRGB(255, 0, 0);
                             led.setOn();
                             timeOut += 100;
-                            System.out.println("Join_Packet recebido de "
-                                    +rdg.getAddress()+" com sucesso!");
+
+                            System.out.println(TelemetryMain.getTime(System.
+                                    currentTimeMillis())+", node: "+IEEEAddress.
+                                    toDottedHex(Spot.getInstance().
+                                    getRadioPolicyManager().getIEEEAddress())+
+                                    " Join_Packet received "
+                                    +rdg.getAddress()+" with success!");
                         }
                    }
 
-                    System.out.println("Quantidade de nós subordinados: "
+                    System.out.println(TelemetryMain.getTime(System.
+                            currentTimeMillis())+", node: "+IEEEAddress.
+                            toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())+
+                            " Quantity of non-CH joined to this CH: "
                             +addressNodes.size());
 
                     led.setOff();
                     led.setRGB(255, 255, 0);
                     led.setOn();
 
-                   System.out.println("Início do envio do TDMA_Packet!");
+                   System.out.println(TelemetryMain.getTime(System.
+                           currentTimeMillis())+", node: "+IEEEAddress.
+                           toDottedHex(Spot.getInstance().
+                           getRadioPolicyManager().getIEEEAddress())+
+                           " Starting TDMA_Packet sending!");
 
                    Datagram newDg = null;
 
                    for(int i = 0; i < addressNodes.size(); i++)
                    {
-                       System.out.println("Endereço destinatário do pacote "
-                               + "TDMA: "+(String)addressNodes.elementAt(i));
+                       System.out.println(TelemetryMain.getTime(System.
+                               currentTimeMillis())+", node: "+IEEEAddress.
+                               toDottedHex(Spot.getInstance().
+                               getRadioPolicyManager().getIEEEAddress())+
+                               " Destination address TDMA packet: "+
+                               (String)addressNodes.elementAt(i));
 
                        if(txConn != null && thread == Thread.currentThread())
                        {
                            txConn = (RadiogramConnection) Connector.
                                    open("radiogram://"+(String)addressNodes.
                                    elementAt(i)+":"+CONNECTED_PORT);
-                           newDg = txConn.newDatagram(txConn.
-                                   getMaximumLength());
+                           newDg = txConn.newDatagram(TDMA_PACKET_SIZE);
                            newDg.writeByte(TDMA_PACKET);
                            newDg.writeByte(addressNodes.indexOf(addressNodes.
                                    elementAt(i)));
                            newDg.writeByte(addressNodes.size());
                            txConn.send(newDg);
                            txConn.close();
-                           System.out.println("TDMA enviado com sucesso para "
-                                   + "o endereço: "+"radiogram://"+
+
+                           System.out.println(TelemetryMain.getTime(System.
+                                   currentTimeMillis())+", node: "+IEEEAddress.
+                                   toDottedHex(Spot.getInstance().
+                                   getRadioPolicyManager().getIEEEAddress())+
+                                   " TDMA sent with success to"
+                                   + "address node: "+"radiogram://"+
                                    (String)addressNodes.elementAt(i)+":"+
                                    CONNECTED_PORT);
                        }
                        
                    }
                    
-                   System.out.println("Envio do TDMA finalizado!");
+                   System.out.println(TelemetryMain.getTime(System.
+                           currentTimeMillis())+", node: "+IEEEAddress.
+                           toDottedHex(Spot.getInstance().
+                           getRadioPolicyManager().getIEEEAddress())+
+                           " TDMA sending process accomplished!");
+
                    rcvConn.close();
                    
                 }
                 catch (IOException ex)
                 {
-                    System.out.println(ex.getMessage()+"Excecao 2");
+                    System.out.println(ex.getMessage());
                 }
                 finally
                 {
                     
                 }
     }
-
 
 }

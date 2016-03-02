@@ -5,22 +5,25 @@
 
 package org.sunspotworld.demo.util;
 
+import com.sun.cldc.jna.Spot;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.service.IService;
+import com.sun.spot.util.IEEEAddress;
 import java.io.IOException;
 import java.util.Vector;
 import javax.microedition.io.Connector;
-import org.sunspotworld.demo.PacketTypes;
+import org.sunspotworld.demo.PacketType;
+import org.sunspotworld.demo.TelemetryMain;
 
 /**
  *
  * @author USUARIO
  */
-public class Aggregator implements IService, PacketTypes
+public class Aggregator implements IService, PacketType
 {
     private long now = 0L;
-    private double mean;
+    private double mean = 0;
     private Radiogram dg;
     private int statusHere = STOPPED;
     private Thread thread = null;
@@ -53,22 +56,23 @@ public class Aggregator implements IService, PacketTypes
             {       
                 if((System.currentTimeMillis()-now) > (30000))
                 {
-                    System.out.println("Timeout do aggregator"
-                            + "finalizou!! Tamanho: "+dataValues.size());
+                    System.out.println(TelemetryMain.getTime(System.
+                            currentTimeMillis())+", CH node status: \n"
+                            +"\t -Aggregator timeout reached!\n\t-DATA_PACKETS "
+                            + "vector size: "+dataValues.size());
 
                         for(int i = 0; i < dataValues.size(); i++)
                         {
-                            System.out.println("TAMANHO VETOR - DATA_PACKETS: "+
-                                dataValues.size());
-                            
                             mean += ((Integer)dataValues.
                                     elementAt(i)).doubleValue();
                         }
 
+                    if(!dataValues.isEmpty())
                         mean = (double)mean/(double)dataValues.size();
                     
-                    System.out.println("Aggregator calculou a "
-                            + "seguinte media: "+mean);
+                    System.out.println(TelemetryMain.getTime(System.
+                currentTimeMillis())+" Aggregate object got the follow "
+                            + "mean: "+mean);
                     sendAggregatedData();
                     stop();
                 }
@@ -77,13 +81,15 @@ public class Aggregator implements IService, PacketTypes
 
     public void sendAggregatedData()
     {
-        System.out.println("Iniciando o processo de envio!");
+        System.out.println(TelemetryMain.getTime(System.
+                currentTimeMillis())+", CH node status: Sending aggregated"
+                + " data to basestation.");
 
         try
         {
             txConn = (RadiogramConnection) Connector.
                     open("radiogram://broadcast"+":"+CONNECTED_PORT);
-            dg = (Radiogram) txConn.newDatagram(txConn.getMaximumLength());
+            dg = (Radiogram) txConn.newDatagram(AGGREGATE_PACKET_SIZE);
             dg.writeByte(AGGREGATE_PACKET);
             dg.writeDouble(mean);
             txConn.send(dg);
