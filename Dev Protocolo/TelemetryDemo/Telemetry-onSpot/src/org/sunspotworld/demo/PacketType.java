@@ -31,9 +31,10 @@ package org.sunspotworld.demo;
  */
 public interface PacketType
 {
-
     /** Port to use to locate the host application. */
-    public static final String BROADCAST_PORT = "42";
+    public static final String BROADCAST_PORT = "44";
+    /** Port to use to locate the host application. */
+    public static final String BROADCAST_PORT_II = "45";
     /** Port to use for sending commands and replies between the SPOT and the host application. */
     public static final String CONNECTED_PORT = "43";
           
@@ -74,7 +75,8 @@ public interface PacketType
     public static final byte ADV_PACKET_SIZE = 100;
     public static final byte AGGREGATE_PACKET_SIZE = 100;
     public static final byte OPERATING_LEACH_PACKET_SIZE = 100;
-    public static final float PERCENTAGE_CLUSTER_HEAD = (float) 0.1;
-    public static final int TIMEOUT_DATA_PACKET = 30000;
+    public static final float CLUSTER_HEAD_QUANTITY = (float) 0.2;
+    public static final byte NODES_QUANTITY = 10;
+    public static final int TIMEOUT_DATA_PACKET = 2000;
 
 }
