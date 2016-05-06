@@ -45,7 +45,7 @@ import com.sun.spot.service.IService;
  * @see com.sun.spot.service.IService
  * @see com.sun.spot.peripheral.IAT91_TC
  */
-public abstract class PeriodicTask extends Resource implements IService {
+public class PeriodicTask extends Resource implements IService {
     
     private static final int DEFAULT_PERIOD = 10;
     private static final double count_per_msec[] = { 7488, 1872, 468, 32.8 };
@@ -64,13 +64,16 @@ public abstract class PeriodicTask extends Resource implements IService {
     private String name = "Periodic Task Execution";
     protected int priority = Thread.MIN_PRIORITY;
     protected IAT91_TC timer = null;
+    protected IPeriodicTask periodicTask;
     
     /**
      * Creates a new instance of PeriodicTask.
      * 
      * @param index specifies which timer to use (0-3)
      */
-    public PeriodicTask(int index) {
+    public PeriodicTask(IPeriodicTask p, int index)
+    {
+        this.periodicTask = p;
         initialize(index, DEFAULT_PERIOD);
     }
 
@@ -80,7 +83,9 @@ public abstract class PeriodicTask extends Resource implements IService {
      * @param index specifies which timer to use (0-3) or -1 if just using Thread.sleep()
      * @param period in milliseconds between tasks
      */
-    public PeriodicTask(int index, int period) {
+    public PeriodicTask(IPeriodicTask p, int index, int period)
+    {
+        this.periodicTask = p;
         initialize(index, period);
     }
 
@@ -91,7 +96,9 @@ public abstract class PeriodicTask extends Resource implements IService {
      * @param period in milliseconds between tasks
      * @param priority the priority for the task loop thread
      */
-    public PeriodicTask(int index, int period, int priority) {
+    public PeriodicTask(IPeriodicTask p,int index, int period, int priority)
+    {
+        this.periodicTask = p;
         this.priority = priority;
         initialize(index, period);
     }
@@ -114,7 +121,11 @@ public abstract class PeriodicTask extends Resource implements IService {
      * Called once per task period to perform measurements.
      * Must be defined in classes that extend PeriodicTask.
      */
-    abstract public void doTask();
+     public void doTask()
+     {
+         periodicTask.doTask();
+     }
+        
     
     /**
      * Set the priority for the task loop thread.

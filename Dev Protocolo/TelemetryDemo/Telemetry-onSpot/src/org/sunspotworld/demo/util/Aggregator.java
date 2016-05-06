@@ -5,11 +5,9 @@
 
 package org.sunspotworld.demo.util;
 
-import com.sun.cldc.jna.Spot;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.service.IService;
-import com.sun.spot.util.IEEEAddress;
 import java.io.IOException;
 import java.util.Vector;
 import javax.microedition.io.Connector;
@@ -54,7 +52,7 @@ public class Aggregator implements IService, PacketType
 
             while(statusHere == RUNNING && thread == Thread.currentThread())
             {       
-                if((System.currentTimeMillis()-now) > (30000))
+                if((System.currentTimeMillis()-now) > (2000))
                 {
                     System.out.println(TelemetryMain.getTime(System.
                             currentTimeMillis())+", CH node status: \n"

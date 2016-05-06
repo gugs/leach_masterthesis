@@ -221,7 +221,7 @@ public class PacketReceiver extends Resource implements IService {
                     receiverLoop();
                 }
             };
-            thread.setPriority(Thread.MAX_PRIORITY - 3);
+            thread.setPriority(Thread.MAX_PRIORITY - 2);
             thread.start();
             System.out.println("Starting packet receiver: " + name);
         }

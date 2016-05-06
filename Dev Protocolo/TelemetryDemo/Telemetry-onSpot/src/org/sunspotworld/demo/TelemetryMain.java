@@ -25,11 +25,8 @@ package org.sunspotworld.demo;
 
 import com.sun.spot.resources.transducers.SwitchEvent;
 import javax.microedition.rms.RecordStoreNotOpenException;
-import org.sunspotworld.demo.util.CoordinatorService;
-import org.sunspotworld.demo.util.LocateServiceListener;
 import org.sunspotworld.demo.util.PacketHandler;
 import org.sunspotworld.demo.util.PacketReceiver;
-import org.sunspotworld.demo.util.PacketTransmitter;
 import org.sunspotworld.demo.util.PeriodicTask;
 
 import com.sun.spot.peripheral.Spot;
@@ -41,19 +38,23 @@ import com.sun.spot.util.IEEEAddress;
 import com.sun.spot.util.Utils;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
+import com.sun.spot.peripheral.external.ExternalBoard;
 import com.sun.spot.resources.transducers.ISwitch;
 import com.sun.spot.resources.transducers.ISwitchListener;
 import com.sun.spot.service.BootloaderListenerService;
+import com.sun.spot.util.DummyApp;
 
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Random;
+import java.util.Vector;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 import org.sunspotworld.demo.util.Aggregator;
+import org.sunspotworld.demo.util.IPeriodicTask;
 import org.sunspotworld.demo.util.PersistenceUnit;
 
 /**
@@ -110,16 +111,18 @@ import org.sunspotworld.demo.util.PersistenceUnit;
  * @see PacketTypes
  */
 public class TelemetryMain extends MIDlet
-        implements  PacketHandler, PacketType , ISwitchListener
+        implements  PacketHandler, PacketType , IPeriodicTask, ISwitchListener
 {
     private boolean connected = false;
     private Random r;
-    private CoordinatorService locator;
+    //private CoordinatorService locator;
     private PacketReceiver rcvrBS;
-    private PacketTransmitter xmit;
-    private RadiogramConnection hostConn;
-    private Aggregator aggregator;
+    //private PacketTransmitter xmit;
+    private RadiogramConnection hostConn = null;
+    private RadiogramConnection txConn = null;
+    //private Aggregator aggregator;
     private PersistenceUnit persistence;
+
 
     private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.
             lookup(ITriColorLEDArray.class);
@@ -140,7 +143,7 @@ public class TelemetryMain extends MIDlet
     private boolean isCT = false;
     private int maxRssiCoordinator = 0;
     private String clusterHeadAddress = "";
-    private int clusterHeadColor = 0;
+    private int clusterHeadLed = 0;
     private byte indexSlotTimmer = 0;
     private byte clusterLength = 0;
     private final int tdmaSlotTime = 20000;
@@ -149,6 +152,16 @@ public class TelemetryMain extends MIDlet
     private boolean flagTDMA = false;
     private boolean dataPacketPhase = true;
     private Radiogram dgController;
+
+
+    //moving coordinator
+    private long ourMacAddress;
+    private Thread thread = null;
+    private int ledColor = 0;
+    private long now = 0L;
+    private Vector addressNodes;
+    private boolean joinStartTimeControl = false;
+    private int joinTimeOut = 100;
     
     /////////////////////////////////////////////////////
     //
@@ -161,13 +174,17 @@ public class TelemetryMain extends MIDlet
      */
     public void initialize() 
     {
+        if(persistence == null)
+        {
+            persistence = new PersistenceUnit();
+            System.out.println("[System Information] Instanciate Persistence Unit");
+        }
+            
+        addressNodes = new Vector();
         r = new Random();
         led1.setRGB(50,0,0);     // Red = not active
         led1.setOn();
-        persistence = new PersistenceUnit();
-        persistence.openRecordStoreForLog();
         startListeningBaseStation();
-
         // create a service locator using the correct port & connection commands
         //locator = new CoordinatorService();
 
@@ -181,7 +198,6 @@ public class TelemetryMain extends MIDlet
 
     private void startListeningBaseStation()
     {
-        locator = new CoordinatorService();
 
         try
         {           
@@ -198,19 +214,20 @@ public class TelemetryMain extends MIDlet
                         +BROADCAST_PORT);
                 rcvrBS = new PacketReceiver(hostConn);
             }
-            else
-            {
-                
-                rcvrBS.stop();
-                System.out.println(getTime(System.currentTimeMillis())+
-                        ", node: "+IEEEAddress.toDottedHex(Spot.getInstance().
-                        getRadioPolicyManager().getIEEEAddress())+
-                        "Status: An instance from PacketReceived is "
-                        + "already created!");
-                hostConn = (RadiogramConnection) Connector.open("radiogram://:"
-                        +BROADCAST_PORT);
-                rcvrBS.setRadiogramConnection(hostConn);
-            }
+//            else
+//            {
+//
+//                rcvrBS.stop();
+//                System.out.println(getTime(System.currentTimeMillis())+
+//                        ", node: "+IEEEAddress.toDottedHex(Spot.getInstance().
+//                        getRadioPolicyManager().getIEEEAddress())+
+//                        "Status: An instance from PacketReceived is "
+//                        + "already created!");
+//                hostConn = (RadiogramConnection) Connector.open("radiogram://:"
+//                        +BROADCAST_PORT);
+//                rcvrBS = null;
+//                rcvrBS = new PacketReceiver(hostConn);
+//            }
         }
         catch(IOException ex)
         {
@@ -226,6 +243,7 @@ public class TelemetryMain extends MIDlet
         rcvrBS.registerHandler(this, ADV_PACKET);
         rcvrBS.registerHandler(this, TDMA_PACKET);
         rcvrBS.registerHandler(this, DATA_PACKET);
+        rcvrBS.registerHandler(this, PERSISTENCE);
         rcvrBS.start();
     }
 
@@ -242,7 +260,6 @@ public class TelemetryMain extends MIDlet
         led1.setRGB(50,0,0);     // Red = not active
         connected = false;
         //accelMonitor.stop();
-        xmit.stop();
         rcvrBS.stop();
         Utils.sleep(100);       // give things time to shut down
         try {
@@ -255,7 +272,7 @@ public class TelemetryMain extends MIDlet
         {
             System.out.println("Failed to close connection to host: " + ex);
         }
-        locator.stop();
+        //locator.stop();
     }
     
 
@@ -296,9 +313,9 @@ public class TelemetryMain extends MIDlet
                         blinkLEDs();
                         if(isCH)
                         {
-                            locator.forwardResetPacket();
-                            locator.stop();
-                            locator = null;
+                            //locator.forwardResetPacket();
+                            //locator.stop();
+                            //locator = null;
                             rcvrBS = null;
                             startListeningBaseStation();
                             
@@ -306,7 +323,7 @@ public class TelemetryMain extends MIDlet
                         else
                         {
                             startListeningBaseStation();
-                            locator.stop();
+                            //locator.stop();
                             //System.out.println("Deveria resetar a conf 2!");
                         }
                             
@@ -314,7 +331,7 @@ public class TelemetryMain extends MIDlet
                         isCT = false;
                         flagTDMA = false;
                         clusterHeadAddress = "";
-                        clusterHeadColor = 0;
+                        clusterHeadLed = 0;
                         indexSlotTimmer = 0;
                         clusterLength = 0;
                     }
@@ -322,14 +339,75 @@ public class TelemetryMain extends MIDlet
                     
                     break;
 
+                case PERSISTENCE:
+
+                    txConn = (RadiogramConnection) Connector.
+                                   open("radiogram://broadcast:"+
+                                   BROADCAST_PORT);
+
+                    Datagram dgtx = txConn.
+                            newDatagram(txConn.getMaximumLength());
+                    int temp = 0;
+
+                    try
+                    {
+                        persistence.openRecordStoreForLog();
+                        temp = persistence.getRecordsAmount();
+                        persistence.closeRecStore();
+                        temp++;
+                    }
+                    catch (RecordStoreNotOpenException ex)
+                    {
+                        ex.printStackTrace();
+                    }
+
+                    dgtx.writeInt(temp);
+
+                    txConn.send(dgtx);
+
+                    txConn.close();
+                    
+                    blinkLEDs();
+
+                    break;
+
                 //LEACH
                 case START_LEACH_ENGINE:
 
                     dgController = pkt;
 
+                    System.out.println("[System Information],"+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", LEACH STARTED in, "
+                            +getTime(System.currentTimeMillis()));
+
+                    persistence.openRecordStoreForLog();
+                    persistence.writeRecord("[System Information],"+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", LEACH STARTED in, "
+                            +getTime(System.currentTimeMillis()));
+                    persistence.closeRecStore();
+
+                    try
+                    {
+                        System.out.println("[System Information],"+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +" data size stored "+
+                            persistence.getRecordsAmount());
+                    }
+                    catch (RecordStoreNotOpenException ex)
+                    {
+                        ex.printStackTrace();
+                    }
+                    
                     initialTime = System.currentTimeMillis();
                     
                     resetStatus = false;
+                    joinStartTimeControl = false;
+
                     leds.setOff();
                     led4.setRGB(0, 100, 100);
                     led4.setOn();
@@ -338,66 +416,155 @@ public class TelemetryMain extends MIDlet
                     led7.setOff();
                     led8.setOff();
                     maxRssiCoordinator = 0;
-                    led8.setOff();
 
-                    if(roundNumber >= 1/PERCENTAGE_CLUSTER_HEAD)
+                    if(roundNumber >= 1/CLUSTER_HEAD_QUANTITY)
                     {
                         roundNumber = 0;
                         isCH = false;
                         isCT = false;
+                        addressNodes.removeAllElements();
                     }
 
                     randomNumber = r.nextDouble();
 
                     if(isCH)
                     {
-                        locator.stop();
                         isCH = false;
                         isCT = true;
+                        addressNodes.removeAllElements();
                     }
                     if(isCT)
                     {
                         probability = 0;
-                        locator.stop();
+                        led8.setColor(LEDColor.RED);
+                        led8.setOn();
                     }
                     else
                     {
-                        if(roundNumber >= (1/PERCENTAGE_CLUSTER_HEAD - 1))
-                        {
+                        if(roundNumber >= (1/ CLUSTER_HEAD_QUANTITY - 1))
                             probability = 1;
-                        }
                         else
                         {
-                            probability = PERCENTAGE_CLUSTER_HEAD
-                                    /(1-PERCENTAGE_CLUSTER_HEAD*
+                            probability = CLUSTER_HEAD_QUANTITY
+                                    /(1 - CLUSTER_HEAD_QUANTITY*
                                     (roundNumber % 
-                                    (int)(1/PERCENTAGE_CLUSTER_HEAD)));
+                                    (int)(1/CLUSTER_HEAD_QUANTITY)));
                         }
-
                     }
 
                     if(randomNumber<probability)
                     {
-                        isCH = true;
-                        locator.setStatusLed(led6);
-                        locator.start();
-                        clusterHeadColor = locator.getCHColor();
-                        leds.getLED(clusterHeadColor).setOff();
-                        leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
-                        leds.getLED(clusterHeadColor).setOn();
+                        roundNumber++;
+                        led1.setRGB(0, 50, 0);
+                        led1.setOn();
                         
+                        init();
+
+                        isCH = true;
+
+                        System.out.println("[System Information],"+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", was elected CH in, "
+                            +getTime(System.currentTimeMillis()));
+
+                        clusterHeadLed = ledColor;
+                        leds.getLED(clusterHeadLed).setOff();
+                        leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
+                        leds.getLED(clusterHeadLed).setOn();
+
+
+                        led6.setOff();
+                        led6.setRGB(clusterHeadLed,40,100);
+                        led6.setOn();
+
+                        txConn = null;
+
+                        now = 0L;
+
+                        Utils.sleep(50);
+
+                        try
+                        {
+
+                           txConn = (RadiogramConnection) Connector.
+                                   open("radiogram://broadcast:" +
+                                   BROADCAST_PORT);
+                           Datagram xdg = txConn.newDatagram(ADV_PACKET_SIZE);
+
+                           led6.setOff();
+                           led6.setRGB(255,255,100);
+                           led6.setOn();
+
+                           System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", seding ADV_PACKET in, "
+                            +getTime(System.currentTimeMillis()));
+
+                           if (led6 != null)
+                           {
+                              led6.setRGB(ledColor,40,0);
+                              led6.setOn();
+                           }
+
+                           xdg = mountAdvPacket(ADV_PACKET, xdg,
+                                   ourMacAddress, ledColor);
+
+                           led6.setOff();
+                           led6.setColor(LEDColor.YELLOW);
+                           led6.setOn();
+
+                           Utils.sleep(100);
+                           txConn.send(xdg);
+
+                           rcvrBS.stop();
+
+                           hostConn.close();
+
+                           hostConn = (RadiogramConnection) Connector.
+                                    open("radiogram://:"+CONNECTED_PORT);
+
+                           rcvrBS = null;
+                           rcvrBS = new PacketReceiver(hostConn);
+                           rcvrBS.registerHandler(this, TDMA_PACKET);
+                           rcvrBS.registerHandler(this, DATA_PACKET);
+                           rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
+                           rcvrBS.registerHandler(this, JOIN_PACKET);
+                           rcvrBS.registerHandler(this, ADV_PACKET);
+                           rcvrBS.registerHandler(this, START_LEACH_ENGINE);
+                           rcvrBS.registerHandler(this, PERSISTENCE);
+
+                           rcvrBS.start();
+                           
+                           System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", checking is PacketReceiver is alive: "+
+                            rcvrBS.isRunning()+" in,"
+                            +getTime(System.currentTimeMillis()));
+
+                        }
+                        catch (IOException ex)
+                        {
+                            System.out.println(ex.getMessage());
+                        }
+                        finally
+                        {
+                           if(txConn != null)
+                           {
+                               txConn.close();
+                               txConn = null;
+                           }
+                        }
                     }
-
-                    System.out.println(getTime(System.currentTimeMillis())+
-                        ", node: "+IEEEAddress.toDottedHex(Spot.getInstance().
-                        getRadioPolicyManager().getIEEEAddress())+
-                        "Is this a CH? "+isCH+", Is PacketReceive service"
-                        + " running? "
-                            +rcvrBS.isRunning());
-
-                    roundNumber++;
-                    led1.setRGB(0, 50, 0);
-                    led1.setOn();
+                    else
+                    {
+                        roundNumber++;
+                        led1.setRGB(0, 50, 0);
+                        led1.setOn();
+                        init();
+                    }
                     break;
 
                 case ADV_PACKET:
@@ -409,110 +576,136 @@ public class TelemetryMain extends MIDlet
                         if(maxRssiCoordinator < pkt.getRssi())
                         {
                             maxRssiCoordinator = pkt.getRssi();
-                            
-                            System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    "WARNING: Receiving ADV Packet sent from"
-                                    + " CH: "+IEEEAddress.toDottedHex(Spot.
-                                    getInstance().getRadioPolicyManager().
-                                    getIEEEAddress()));
 
-                            for(int i = 1; i < 5; i++)
-                            {
-                                leds.getLED(i).setOff();
-                            }
-                            
+                            System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", is CH"+isCH+" receiving ADV_Packet from: "+
+                            pkt.getAddress()+" in,"
+                            +getTime(System.currentTimeMillis()));
+
+                            cleanCHLeds(); //set off ch's leds indicators
+
                             pkt.resetRead();
                             pkt.readByte();
                             long address = pkt.readLong();
-                            clusterHeadColor = pkt.readInt();
-                            leds.getLED(clusterHeadColor).setOff();
-                            leds.getLED(clusterHeadColor).setRGB(255, 255, 255);
-                            leds.getLED(clusterHeadColor).setOn();
+                            clusterHeadLed = pkt.readInt();
+                            leds.getLED(clusterHeadLed).setOff();
+                            leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
+                            leds.getLED(clusterHeadLed).setOn();
                             clusterHeadAddress = IEEEAddress.
                                     toDottedHex(address);
 
 
-                            System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    "CH Address elected: radiogram"
-                                    + "://"+clusterHeadAddress+":"
-                                    +CONNECTED_PORT+", by node: "+IEEEAddress.
-                                    toDottedHex(Spot.
-                                    getInstance().getRadioPolicyManager().
-                                    getIEEEAddress()));
-                            
-                            rcvrBS.stop();
-
-                            if(hostConn != null)
-                            {
-                                hostConn.close();
-                                hostConn = null;
-                            }
-
-                            hostConn = (RadiogramConnection) Connector.
+                            txConn = (RadiogramConnection) Connector.
                                     open("radiogram://"+clusterHeadAddress+":"
                                     +CONNECTED_PORT);
-                            hostConn.setTimeout(-1);
-                            rcvrBS.setRadiogramConnection(hostConn);
-                            rcvrBS.start();
 
-                            Datagram answerCH = hostConn.
+                            txConn.setTimeout(-1);
+
+                            Datagram answerCH = txConn.
                                     newDatagram(JOIN_PACKET_SIZE);
-                            xmit = new PacketTransmitter(hostConn);
-                            xmit.start();
 
-                            answerCH = (xmit.newDataPacket(JOIN_PACKET,
-                                    JOIN_PACKET_SIZE));
-                            Utils.sleep(300);
-                            xmit.send(answerCH);
-                                
+                            answerCH.writeByte(JOIN_PACKET);
+
+                            Utils.sleep(100);
+
+                            txConn.send(answerCH);
+
+                            txConn.close();
+
+                            txConn = null;
+
                             rcvrBS.stop();
 
-                            if(hostConn != null)
-                            {
-                                hostConn.close();
-                                hostConn = null;
-                            }
-                            
+                            hostConn.close();
+
                             hostConn = (RadiogramConnection) Connector.
                                     open("radiogram://:"+CONNECTED_PORT);
-                            rcvrBS.setRadiogramConnection(hostConn);
+
+                            rcvrBS = null;
+                            rcvrBS = new PacketReceiver(hostConn);
                             rcvrBS.registerHandler(this, TDMA_PACKET);
                             rcvrBS.registerHandler(this, DATA_PACKET);
                             rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
                             rcvrBS.registerHandler(this, JOIN_PACKET);
                             rcvrBS.registerHandler(this, ADV_PACKET);
                             rcvrBS.registerHandler(this, START_LEACH_ENGINE);
+                            rcvrBS.registerHandler(this, PERSISTENCE);
                             rcvrBS.start();
 
-                            System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    " Waiting to receive packets!");
-                            
+                            System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", is waiting for TDMA_Packet in,"
+                            +getTime(System.currentTimeMillis()));
+
                         }
                     }
-                    else
-                    {
-//                            rcvrBS.registerHandler(this, TDMA_PACKET);
-//                            rcvrBS.registerHandler(this, DATA_PACKET);
-//                            rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
-                    }
+
                     break;
+
+                case JOIN_PACKET:
+
+                   if(!joinStartTimeControl)
+                   {
+                       joinStartTimeControl = true;
+
+                       thread = new Thread(new Runnable()
+                       {
+                           public void run()
+                           {
+                                try
+                                {
+                                    replyJoins();
+                                }
+                                catch (IOException ex)
+                                {
+                                    ex.printStackTrace();
+                                }
+                           }
+                       }
+                    );
+                        thread.setPriority(Thread.MAX_PRIORITY);
+                        thread.start();
+                    }
+
+                    led6.setOff();
+                    led6.setRGB(0, 255, 0);
+                    led6.setOn();
+
+                    if(!addressNodes.contains(pkt.getAddress()))
+                    {
+                        addressNodes.addElement(pkt.getAddress());
+                        System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", received Join Request from node "+
+                            pkt.getAddress()+" in,"
+                            +getTime(System.currentTimeMillis()));
+                    }
+
+                    led6.setOff();
+                    led6.setColor(LEDColor.CYAN);
+                    led6.setOn();
+
+                   break;
 
                 case TDMA_PACKET:
 
+                    System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", isCH: "+isCH+" received a TDMA_Packet from "+
+                            pkt.getAddress()+" in,"
+                            +getTime(System.currentTimeMillis()));
+
                     pkt.resetRead();
                     pkt.readByte();
-                    long now = 0L;
                     double fator = 0;
                     boolean alreadySent = false;
+
+                    txConn = null;
 
                     indexSlotTimmer = (pkt.readByte());
                     indexSlotTimmer++;
@@ -521,126 +714,86 @@ public class TelemetryMain extends MIDlet
                     int time = (int)(tdmaSlotTime*fator);
 
 
-                    System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
+                    System.out.println("[System Information], "+IEEEAddress.
                                     toDottedHex(Spot.getInstance().
                                     getRadioPolicyManager().getIEEEAddress())+
-                                    "Non CH Node received from "+
-                                    pkt.getAddress()+", "
-                                    + "a TDMA Packet with the follow "
-                                    + "information:\n "
+                                    ", TDMA Summary: \n"
                                     + "-IndexSlotTimmer: "
                                     +indexSlotTimmer+"\n -ClusterLength: "+
                                     clusterLength+"\nisCH: "+isCH+"\nFlagTMDA: "
                                     +flagTDMA+"\nTDMA slot time"+tdmaSlotTime
-                                    +"\n"+ "Factor: "+fator);
+                                    +"\n"+ "Factor: "+fator+" in,"+
+                                    getTime(System.currentTimeMillis()));
 
-                    if(!isCH && !flagTDMA)
-                    {
+                   txConn = (RadiogramConnection) Connector.
+                           open("radiogram://"+clusterHeadAddress+":"
+                           +CONNECTED_PORT);
 
-                           flagTDMA = true;
-                           rcvrBS.stop();
-                           xmit.stop();
+                   txConn.setTimeout(-1);
 
-                           if (hostConn != null)
-                           {
-                                hostConn.close();
-                           }
+                   dataPacket = txConn.newDatagram(DATA_PACKET_SIZE);
 
-                           hostConn = (RadiogramConnection) Connector.
-                                   open("radiogram://"+clusterHeadAddress+":"
-                                   +BROADCAST_PORT);
-                           hostConn.setTimeout(-1);
-                           rcvrBS.setRadiogramConnection(hostConn);
-                           xmit.setRadiogramConnection(hostConn);
+                   now = System.currentTimeMillis();
 
-                           // ADD HANDLERS AFTER RESET PACKETRECEIVER
+                   Utils.sleep(time);
 
-                           rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
-                           rcvrBS.registerHandler(this, START_LEACH_ENGINE);
-                           rcvrBS.registerHandler(this, DATA_PACKET);
-                           rcvrBS.registerHandler(this, ADV_PACKET);
-                           rcvrBS.registerHandler(this, TDMA_PACKET);
-                           rcvrBS.registerHandler(this, JOIN_PACKET);
-                           rcvrBS.start();
-                           xmit.start();
+                   dataPacket.reset();
+                   dataPacket.writeByte(DATA_PACKET);
 
-                           dataPacket = hostConn.
-                                   newDatagram(DATA_PACKET_SIZE);
-                           now = System.currentTimeMillis();
+                   //supposed value collected from transductor
+                   dataPacket.writeInt(10);
 
-                           while((System.currentTimeMillis()-now)<tdmaSlotTime
-                                   && !alreadySent)
-                           {
-                               System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())
-                                       +" will take "+
-                                       getTime(System.currentTimeMillis())+
-                                       "in stand-by mode");
-                               Utils.sleep(time);
+                   txConn.send(dataPacket);
+                   alreadySent = true;
+                   Utils.sleep((tdmaSlotTime - time));
 
-                               System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    " took "+time+" ms in stand-by mode before "
-                                    + "send data_packet.");
-
-                               dataPacket.reset();
-                               dataPacket.writeByte(DATA_PACKET);
-                               //supposed value collected from transductor
-                               dataPacket.writeInt(10);
-                               xmit.send(dataPacket);
-                               alreadySent = true;
-                           }
-                    }
+                   if (txConn != null)
+                   {
+                       txConn.close();
+                       txConn = null;
+                   }
 
                 break;
 
                 case DATA_PACKET:
 
-                    long nowDataPacket = 0L;
+                    //long nowDataPacket = 0L;
 
                     if(dataPacketPhase)
                     {
-                        nowDataPacket = System.currentTimeMillis();
-                        System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    "First DATA_PACKET received "
-                                    + "from non-CH to start the Aggregator");
-                        aggregator = new Aggregator(nowDataPacket);
-                        aggregator.start();
+                        thread = null;
+                        //nowDataPacket = System.currentTimeMillis();
+                        System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +",isCH: "+isCH+
+                            " received first Data_Packet from CH: "+
+                            pkt.getAddress()+" in,"+
+                            getTime(System.currentTimeMillis()));
+                        //aggregator = new Aggregator(nowDataPacket);
+                        //aggregator.start();
                         dataPacketPhase = false;
                     }
                     
-                    System.out.println(getTime(System.
-                            currentTimeMillis())+", node: "+IEEEAddress.
-                            toDottedHex(Spot.getInstance().
-                            getRadioPolicyManager().getIEEEAddress())+
-                            "Is it CH: "+isCH+", and the CH receive"
-                            + "Data_Packet from: "
-                            +pkt.getAddress());
+                    System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +",isCH: "+isCH+
+                            " received first Data_Packet from CH: "+
+                            pkt.getAddress()+" in,"+
+                            getTime(System.currentTimeMillis()));
 
-                    if((System.currentTimeMillis()-pkt.getTimestamp()) <
-                            TIMEOUT_DATA_PACKET)
-                    {
-                           pkt.resetRead();
-                           pkt.readByte();
-                           int temp = pkt.readInt();
-                           aggregator.
-                                   addDataPacketInQueue(Integer.valueOf(temp));
-
-                           System.out.println(getTime(System.
-                                    currentTimeMillis())+", node: "+IEEEAddress.
-                                    toDottedHex(Spot.getInstance().
-                                    getRadioPolicyManager().getIEEEAddress())+
-                                    "Radiogram added in aggregator!");
-                    }
-
+//                    if((System.currentTimeMillis()-pkt.getTimestamp()) <
+//                            TIMEOUT_DATA_PACKET)
+//                    {
+//                           pkt.resetRead();
+//                           pkt.readByte();
+//                           int temp = pkt.readInt();
+//                          // aggregator.
+//                          //        addDataPacketInQueue(Integer.valueOf(temp));
+//
+//                    }
+                    
                 break;
                 //END LEACH
 
@@ -705,6 +858,52 @@ public class TelemetryMain extends MIDlet
         }
     }
 
+    private void replyJoins() throws IOException
+    {
+        Utils.sleep(500); // waiting for vector fillment
+
+        System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", isCH: "+isCH+" registered "+addressNodes+
+                            " Joins requests in,"
+                            +getTime(System.currentTimeMillis()));
+        txConn = null;
+        Datagram newDg = null;
+        int i = 0;
+
+        for(i = 0; i < addressNodes.size(); i++)
+        {
+
+            txConn = (RadiogramConnection) Connector.
+                    open("radiogram://"+(String)addressNodes.
+                    elementAt(i)+":"+CONNECTED_PORT);
+            System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", isCH: "+isCH+" replying with TDMA_Packet node: "
+                            +(String)addressNodes.elementAt(i)+":"+
+                            CONNECTED_PORT+" in,"+
+                            getTime(System.currentTimeMillis()));
+            
+            newDg = txConn.newDatagram(TDMA_PACKET_SIZE);
+            newDg.writeByte(TDMA_PACKET);
+            newDg.writeByte(addressNodes.indexOf(addressNodes.elementAt(i)));
+            newDg.writeByte(addressNodes.size());
+            txConn.send(newDg);
+
+            txConn.close();
+            txConn = null;
+        }
+
+        System.out.println("[System Information], "+
+                            IEEEAddress.toDottedHex(Spot.getInstance().
+                            getRadioPolicyManager().getIEEEAddress())
+                            +", isCH: "+isCH+
+                            " finished TDMA_Packet send process in,"
+                            +getTime(System.currentTimeMillis()));
+    }
+
 
     //////////////////////////////////////////////////////////
     //
@@ -717,49 +916,51 @@ public class TelemetryMain extends MIDlet
      */
     protected void startApp() throws MIDletStateChangeException
     {
-        BootloaderListenerService.getInstance().start();       // Listen for downloads/commands over USB connection
+        BootloaderListenerService.getInstance().start();
+        // Listen for downloads/commands over USB connection
         ISwitch sw1 = (ISwitch) Resources.lookup(ISwitch.class, "sw1");
         sw1.addISwitchListener(this);
         initialize();
+        PeriodicTask p = null;
+        boolean control = false;
 
         while(true)
         {
             Utils.sleep(100);
 
-            if ( initialTime!= -1){
-                if((System.currentTimeMillis()-initialTime) > 25000 )
-                {
-                    System.out.println("Iniciou as coisas");
-                    blinkLEDs();
-                    //startListeningBaseStation();
-                    try {
-                        rcvrBS.stop();
+            if(initialTime != -1)
+            {
+                if(!control)
+                    p = new PeriodicTask(this, 0, 25000);
 
-                        if(hostConn != null)
-                        {
-                            hostConn.close();
-                            hostConn = null;
-                        }
-
-                        hostConn = (RadiogramConnection) Connector.
-                            open("radiogram://:"+BROADCAST_PORT);
-                        rcvrBS.setRadiogramConnection(hostConn);
-                        rcvrBS.registerHandler(this, TDMA_PACKET);
-                        rcvrBS.registerHandler(this, DATA_PACKET);
-                        rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
-                        rcvrBS.registerHandler(this, JOIN_PACKET);
-                        rcvrBS.registerHandler(this, ADV_PACKET);
-                        rcvrBS.registerHandler(this, START_LEACH_ENGINE);
-                        rcvrBS.start();
-                    } catch (Exception e) {
+                    if(!control)
+                    {
+                        p.start();
+                        control = true;
                     }
-                    
-
-                    handlePacket(START_LEACH_ENGINE, dgController);
-                }
             }
+        }
+    }
 
-            
+    protected void assignListeners()
+    {
+        try
+        {
+            hostConn = (RadiogramConnection) Connector.
+                            open("radiogram://:"+BROADCAST_PORT);
+            rcvrBS.setRadiogramConnection(hostConn);
+            rcvrBS.registerHandler(this, TDMA_PACKET);
+            rcvrBS.registerHandler(this, DATA_PACKET);
+            rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
+            rcvrBS.registerHandler(this, JOIN_PACKET);
+            rcvrBS.registerHandler(this, ADV_PACKET);
+            rcvrBS.registerHandler(this, START_LEACH_ENGINE);
+            rcvrBS.registerHandler(this, PERSISTENCE);
+            rcvrBS.start();
+        }
+        catch (IOException ex)
+        {
+            ex.printStackTrace();
         }
     }
 
@@ -789,6 +990,82 @@ public class TelemetryMain extends MIDlet
     public void switchReleased(SwitchEvent evt)
     {
         closeConnection();
+    }
+
+
+    private Datagram mountAdvPacket (byte cmd, Datagram xdg,
+            long address, int color)
+    {
+        try
+        {
+            xdg.reset();
+            xdg.writeByte(cmd);
+            xdg.writeLong(address);
+            xdg.writeInt(color);
+        }
+        catch (IOException ex)
+        {
+            ex.printStackTrace();
+        }
+        return xdg;
+    }
+
+    /**
+     * Method from LEACH scope
+     */
+    private void init()
+    {
+        ledColor = (int)r.nextInt(4);
+        ledColor++;
+        ourMacAddress = Spot.getInstance().getRadioPolicyManager().
+                getIEEEAddress();
+    }
+
+    public void doTask()
+    {
+        System.gc();
+        System.out.println("Round: "
+                +roundNumber+", acomplished!");
+        for (int i = 0; i <= (roundNumber-1); i++)
+        {
+            leds.setColor(LEDColor.MAGENTA);
+            leds.setOn();
+            Utils.sleep(200);
+            leds.setOff();
+            Utils.sleep(200);
+        }
+
+        thread = null;
+        rcvrBS.stop();
+
+        try
+        {
+            if(hostConn != null)
+            {
+                hostConn.close();
+                hostConn = null;
+            }
+            if(txConn != null)
+            {
+                txConn.close();
+                txConn = null;
+            }
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        assignListeners();
+        handlePacket(START_LEACH_ENGINE, dgController);
+    }
+
+    private void cleanCHLeds()
+    {
+        for(int i = 1; i < 5; i++)
+        {
+            leds.getLED(i).setOff();
+        }
     }
 
 }

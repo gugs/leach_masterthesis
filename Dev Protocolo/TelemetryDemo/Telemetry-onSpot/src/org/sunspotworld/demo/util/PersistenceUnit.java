@@ -14,8 +14,8 @@ import javax.microedition.rms.*;
 public class PersistenceUnit
 {
     private RecordStore rsm = null;
-    private final String LOG_RECORD_NON_COORDINATOR = "db_1";
-    private final String LOG_RECORD_COORDINATOR = "db_2";
+    public static final String LOG_RECORD_NON_COORDINATOR = "db_1";
+    public static final String LOG_RECORD_COORDINATOR = "db_2";
 
     public PersistenceUnit()
     {
