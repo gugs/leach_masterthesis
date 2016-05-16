@@ -14,14 +14,12 @@ import javax.microedition.rms.*;
 public class PersistenceUnit
 {
     private RecordStore rsm = null;
-    public static final String LOG_RECORD_NON_COORDINATOR = "db_1";
-    public static final String LOG_RECORD_COORDINATOR = "db_2";
+    private static final String LOG_RECORD_NON_COORDINATOR = "db_1";
 
     public PersistenceUnit()
     {
 
     }
-
 
     public void openRecordStoreForLog()
     {
@@ -29,18 +27,6 @@ public class PersistenceUnit
         {
             rsm = RecordStore.openRecordStore(LOG_RECORD_NON_COORDINATOR, true);
 
-        }
-        catch(Exception e)
-        {
-            dbHandleError(e.getMessage());
-        }
-    }
-
-    public void openRecordStoreForMetrics()
-    {
-        try
-        {
-            rsm = RecordStore.openRecordStore(LOG_RECORD_COORDINATOR, true);
         }
         catch(Exception e)
         {
@@ -73,8 +59,10 @@ public class PersistenceUnit
         }
     }
 
-    public void readRecord() throws RecordStoreException
+    public String readRecord() throws RecordStoreException
     {
+        String output = "";
+
         try
         {
           // Intentionally make this too small to test code below
@@ -86,29 +74,52 @@ public class PersistenceUnit
               recData = new byte[rsm.getRecordSize(i)];
 
             len = rsm.getRecord(i, recData, 0);
-            System.out.println("Record #" + i + ": " +
-                    new String(recData, 0, len));
-            System.out.println("------------------------------");
+            output += "Record #" + i + ": " +
+                    new String(recData, 0, len)+"\n";
           }
         }
         catch (Exception e)
         {
           dbHandleError(e.toString());
         }
+        return output;
      }
+
+    public void updateRecord(int index, String newValue)
+    {
+
+        byte[] newValueByte = newValue.getBytes();
+
+        try
+        {
+            rsm.setRecord(rsm.getNumRecords(), newValueByte, 0, newValueByte.length);
+        }
+        catch (RecordStoreNotOpenException ex)
+        {
+            ex.printStackTrace();
+        }
+        catch (InvalidRecordIDException ex)
+        {
+            ex.printStackTrace();
+        }
+        catch (RecordStoreException ex)
+        {
+            ex.printStackTrace();
+        }
+    }
 
     public void deleteRecStore()
     {
         if (RecordStore.listRecordStores() != null)
         {
-          try
-          {
-            RecordStore.deleteRecordStore(LOG_RECORD_NON_COORDINATOR);
-          }
-          catch (Exception e)
-          {
-            dbHandleError(e.toString());
-          }
+            try
+            {
+                RecordStore.deleteRecordStore(LOG_RECORD_NON_COORDINATOR);
+            }
+            catch (RecordStoreException ex)
+            {
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -120,6 +131,13 @@ public class PersistenceUnit
     private void dbHandleError(String in)
     {
         System.err.println("MSG_ERROR from persistence unit: "+in);
+    }
+
+    public boolean isNull()
+    {
+        if (RecordStore.listRecordStores() == null)
+            return true;
+        return false;
     }
 
 }

@@ -69,6 +69,8 @@ public interface PacketType
 
     public static final byte PERSISTENCE = 16;
 
+    public static final byte ERASE_PERSISTENCE = 17;
+
     /** LEACH parameters */
 
     public static final byte TDMA_PACKET_SIZE = 100;

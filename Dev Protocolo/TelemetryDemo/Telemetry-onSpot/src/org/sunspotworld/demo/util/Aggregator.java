@@ -77,7 +77,7 @@ public class Aggregator implements IService, PacketType
             }
     }
 
-    public void sendAggregatedData()
+    private void sendAggregatedData()
     {
         System.out.println(TelemetryMain.getTime(System.
                 currentTimeMillis())+", CH node status: Sending aggregated"
