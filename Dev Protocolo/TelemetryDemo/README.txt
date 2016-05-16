@@ -1,109 +1,81 @@
-Sun SPOT Telemetry Demo - Version 2.0
+LEACH Protocol Implementation Over Oracle SunSPOT Platform
 
-Author: Ron Goldman
-June 9, 2006,  revised: August 1, 2007 & July 25, 2008
-revised: May 27, 2008 (added emulator instructions - vipul)
-revised: August 1, 2010 for version 2.0
+Author: Gustavo Nobrega Martins
+Email: gustavonobrega@gmail.com
+Github: https://github.com/gugs/leach_masterthesis/
+
+Advisors: Prof. D.Sc. Reinaldo César Gomes de Morais; 
+	  Prof. Ph.D. Marcelo Sampaio de Alencar 
+
+Purpose: Master Thesis Application
+June 1, 2016,
+  
+This code has third part software (Receive Packet skeleton) copied from Telemetry Demo Project - sdk code examples.
+
+Details about third's part softawre author:
+
+ * author Ron Goldman<br>
+ * Date: May 8, 2006,
+ * revised: August 1, 2007
+ * revised: July 25, 2008
+ * revised: August 1, 2010 
+
+--------------------
+TERMS AND CONDITION
+--------------------
+
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+
+
 
 --------
 OVERVIEW
 --------
 
-This is a demo application that provides the basic framework for
-collecting data on a remote SPOT and passing it over the radio to 
-a host application that can record and display it. It was written
-with the hope that it could be easily modified by people developing
-new SPOT applications.
+This is a LEACH (Low Energy Adaptative Clustering Hierarchy) protocol[1] implementation developed in Java2ME with deployment target on Oracle SUnSPOT platform. LEACH protocol was developed by Heinzelman et al concerning energy aware routing protocol. LEACH protocol comprises hierarchical routing protocols applied to WSN (Wireless Sensor Network). More informations about LEACH protocol, please check out external reference in the end of this file.
 
-The framework shows how the remote SPOT and the host application can
-locate each other by the use of broadcast packets. A point-to-point
-radio connection is then established and used to pass commands and
-replies between the host application and the remote SPOT.
+--------------
+HOW TO INSTALL
+--------------
 
-The SPOT application consists of two Java classes: one to handle the
-radio connection to the host application, and the second to read the
-accelerometer and send the data to the host application.
+To deploy this implementation on SunSPOT motes, you can adopt three differents ways to do that: ant file script, solarium application and Netbeans IDE:
 
-To simplify our work we make use of a number of utility helper classes: 
- * LocateService to locate a remote service (on a host)
- * PacketReceiver to receive commands from the host application and 
-      dispatch them to whatever classes registered to handle the command
- * PacketTransmitter handles sending reply packets back to the host
- * PeriodicTask provides for running a task, such as taking samples, 
-      at a regular interval using the timer/counter hardware.
- 
-The host commands and replies are defined in the PacketTypes class.
+1 - ant file script: After sdk installation and environment settings done, you can run the follow command at LEACH's folder: ant deploy . Be sure SunSPOT is connected in USB port and properly installed on operating system.
 
-The SPOT uses its LEDs to display its status as follows:
+2 - solarium: After plugging USB cable into SunSPOT mote, with solarium open, right click over node target, choose deploy option and open up xml file located in LEACH's folder.  
 
-LED 0:
-    * Red = running, but not connected to host
-    * Green = connected to host display server 
+3 - Netbeans: Right click over project's folder and select "build and deploy" option with USB cable plugged into SunSPOT mote.
 
-LED 1:
-    * Yellow = looking for host display server
-    * Blue = calibrating accelerometer
-    * Red blink = responding to a ping request
-    * Green = sending accelerometer values using 2G scale
-    * Blue-green = sending accelerometer values using 6G scale 
+OBS: To perform these procedures above, motes in power on is required.
 
-Pushing switch 1 on the SPOT will cause it to disconnect any
-current connection to the host and try to reconnect.
+--------------------------
+HOW TO LAUNCH SOLARIUM APP
+--------------------------
 
-The host application consists of four main Java classes: one to
-listen for connections from any SPOTs, one to then handle the
-radio connection to a specific remote SPOT, one to display the
-data collected, and the third to manage the GUI.
-
-The host display server lets you collect up to ten minutes of
-accelerometer readings from the SPOT. It will ignore initial zero
-values, so you won't see anything until you move the SPOT. In
-addition to displaying the x, y and z forces, you can also display 
-the magnitude of their vector sum (|a|). You can view the raw data 
-or smooth it using either a boxcar or triangle filter. You can also 
-change the width of the filter window, that is how many samples are 
-used to filter each point.
-
-The host server display also allows the collected data to be saved 
-to a file, or a previously collected file to be viewed. The data 
-can also be printed out. A sample file of collected accelerometer
-readings is included: accel-sample.data for your viewing pleasure.
-
-Javadoc can be found in Telemetry-onSpot/doc/index.html and 
-Telemetry-onDesktop/doc/index.html
-
-
-Here is how the 3 axis of the accelerometer map to the Sun SPOT:
-
-                                  Z  X
-      ________________            | /
-     / / *           /|           |/
-    /_/_*___________/ |       ----. --- Y 
-    |_|  Sun SPOT   | /          /|
-      |_____________|/          / |
-
-
----------------------------------------
-STEPS FOR BUILDING AND RUNNING THE DEMO
----------------------------------------
-
-1. Setup a SPOT to report on its accelerometer:
-
-   [Follow the instructions in 1(a) if you have real SPOTs. Otherwise,
-   follow the instructions in 1(b) if you are using emulated SPOTs.]
-
-   (a) Starting in the directory containing this README file, execute
-
-            % cd Telemetry-onSpot
-            % ant deploy run
-
-   (b) Starting in the directory containing this README file, execute
+Starting in the directory containing this README file, execute
 
             % cd Telemetry-onSpot
             % ant solarium
 
         to start up the Solarium tool which also includes the SPOT
-        emulator. 
+        emulator.
+ 
           i.  Create a virtual SPOT by choosing Emulator -> New Virtual
               SPOT.
          ii.  Right click on the virtual SPOT, choose "Deploy a MIDlet 
@@ -122,33 +94,46 @@ STEPS FOR BUILDING AND RUNNING THE DEMO
           v.  Start the application by right clicking on the virtual 
               SPOT and selecting "Run MIDlet" -> "TelemetryMain".
 
-2. Launch the host-side application to gather and plot accelerometer
-   readings obtained from the SPOT:
+-------------------------
+Sensors' LEDs Indication 
+-------------------------
 
-   [Follow the instructions in 2(a) if you have real SPOTs. Otherwise,
-   follow the instructions in 2(b) if you are using emulated SPOTs.]
+LEDS: [1][2][3][4][5][6][7][8]
 
-       (a) Go into the Telemetry-onDesktop directory, connect a 
-           basestation to your host computer via a USB cable and 
-           execute 'ant host-run'
+[1] Red: Application is running but not started. Waiting packet from basestation to start LEACH's engine;
+    GREEN: Protocol is running and engine was started;
 
-            % cd ../Telemetry-onDesktop
-            % ant host-run
+[2..5] WHITE: The LED position is a manner to identify the clusters among CH and non-CH;
 
-       (b) Go into the Telemetry-onDesktop directory and execute:
+[6] ORANGE: Coordinator is waiting JOIN requests from non-coordinator nodes. It is only possible observe this state 	    when all JOIN requests didn't reach the coordinator node. 
+    CYAN: Coordinator received JOIN request from non-coordinator nodes and step-in TDMA phase.
 
-            % ant host-run -Dbasestation.shared=true
+[8] RED: If red is on, it means nodes was coordinator already, otherwise node will become coordinator (1/PERCENTAGE) 	 rounds;
 
-            (note that the build.properties file has already set the
-             property basestation.not.required to true)
-           
+[1..8] WHITE_FLASHES 4 times: Erasing storage
 
-    This will open a graphical window. Wait until the host application
-    has connected to the SPOT. Click the "Collect Data" button
-    to start plotting accelerometer readings from the SPOT.
+[1..8] WHITE_FLASHES 5 times: Test communication between basestation and motes
 
-    As you move the SPOT (for a virtual SPOT this requires moving the X, Y,
-    and Z sliders in the "accel" tab of the sensor panel) you'll see a 
-    dynamically updated plot of the accelerometer readings along all three 
-    axis (X in green, Y in blue, Z in red and the total acceleration in 
-    orange). 
+[1..8] WHITE_FLASHES Incremental: It means current round of LEACH's cycle   
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXTERNAL REFERENCE:
+
+[1] https://pdos.csail.mit.edu/archive/decouto/papers/heinzelman00.pdf
