@@ -203,6 +203,7 @@ public class PacketReceiver extends Resource implements IService {
     public boolean stop() {
         if (status != STOPPED) {
             status = STOPPING;
+            thread = null;
         }
         System.out.println("Stopping packet receiver: " + name);
         return true;

@@ -64,6 +64,7 @@ public class PeriodicTask extends Resource implements IService {
     private String name = "Periodic Task Execution";
     protected int priority = Thread.MIN_PRIORITY;
     protected IAT91_TC timer = null;
+    //protected IAT91_PowerManager powerManager = null;
     protected IPeriodicTask periodicTask;
     
     /**
@@ -75,6 +76,7 @@ public class PeriodicTask extends Resource implements IService {
     {
         this.periodicTask = p;
         initialize(index, DEFAULT_PERIOD);
+        //powerManager = Spot.getInstance().getAT91_PowerManager();
     }
 
     /**
@@ -87,6 +89,7 @@ public class PeriodicTask extends Resource implements IService {
     {
         this.periodicTask = p;
         initialize(index, period);
+        //powerManager = Spot.getInstance().getAT91_PowerManager();
     }
 
     /**
@@ -101,6 +104,7 @@ public class PeriodicTask extends Resource implements IService {
         this.periodicTask = p;
         this.priority = priority;
         initialize(index, period);
+        //powerManager = Spot.getInstance().getAT91_PowerManager();
     }
 
     private void initialize(int index, int period){
@@ -125,6 +129,11 @@ public class PeriodicTask extends Resource implements IService {
      {
          periodicTask.doTask();
      }
+
+//     public void setMasterClockToAT91(int masterClockConstant)
+//     {
+//         powerManager.setShallowSleepClockMode(masterClockConstant);
+//     }
         
     
     /**
