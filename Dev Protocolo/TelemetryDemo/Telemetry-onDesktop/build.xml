@@ -37,7 +37,7 @@ DEALINGS IN THE SOFTWARE.
         </copy>
     </target>
 
-    <target name="base" depends="startbasestation" />
+    <!--<target name="base" depends="startbasestation" />-->
 
     <target name="jar" depends="init">
         <jar destfile="${build.dir}/telemetry.jar"> 

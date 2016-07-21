@@ -25,7 +25,6 @@ package org.sunspotworld.demo;
 
 
 import javax.microedition.rms.RecordStoreException;
-import javax.microedition.rms.RecordStoreNotOpenException;
 import org.sunspotworld.demo.util.PacketHandler;
 import org.sunspotworld.demo.util.PacketReceiver;
 import org.sunspotworld.demo.util.PeriodicTask;
@@ -36,7 +35,6 @@ import com.sun.spot.util.Utils;
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.ISleepManager;
-import com.sun.spot.peripheral.UnableToDeepSleepException;
 import com.sun.spot.peripheral.radio.RadioPolicy;
 import com.sun.spot.resources.Resources;
 import com.sun.spot.resources.transducers.ITriColorLED;
@@ -113,7 +111,6 @@ import org.sunspotworld.demo.util.PersistenceUnit;
 public class TelemetryMain extends MIDlet
         implements  PacketHandler, PacketType , IPeriodicTask
 {
-    private boolean connected = false;
 
     private Random r;
     private PacketReceiver rcvrBS;
@@ -121,7 +118,7 @@ public class TelemetryMain extends MIDlet
     private RadiogramConnection txConn = null;
     //private Aggregator aggregator;
                             
-    //private PersistenceUnit persistence;
+    private PersistenceUnit persistence;
     private PeriodicTask periodicTask;
     private ISleepManager sleepManager = Spot.getInstance().getSleepManager();
 
@@ -151,12 +148,15 @@ public class TelemetryMain extends MIDlet
     private byte clusterLength = 0;
     private final int tdmaSlotTime = 20000;
     private Datagram dataPacket;
-    private boolean resetStatus = false;
     private boolean flagTDMA = false;
     private boolean dataPacketPhase = true;
     private Radiogram dgController;
     private Radiogram dgController2;
     private boolean persistenceControl = true;
+    private long lastAddressAdv = 0L;
+
+    //Overall round for both
+    private int overAllCount = 0;
 
     //packets' counters for non-CH
     private int advCountNode = 0;
@@ -178,24 +178,17 @@ public class TelemetryMain extends MIDlet
     private Vector addressNodes;
     private boolean joinStartTimeControl = false;
     private int joinTimeOut = 100;
+    private boolean controlADV = false;
     
-    /////////////////////////////////////////////////////
-    //
-    // Lifecycle management - called from startApp() method
-    //
-    /////////////////////////////////////////////////////
-    
-    /**
-     * Initialize any needed variables.
-     */
+
     public void initialize() 
     {
-//                if(persistence == null)
-//                {
-//                    persistence = new PersistenceUnit();
-//                    System.out.println("[System Information] Instantiating "
-//                            + "Persistence Unit");
-//                }
+                if(persistence == null)
+                {
+                    persistence = new PersistenceUnit();
+                    System.out.println("[System Information] Instantiating "
+                            + "Persistence Unit");
+                }
             
         addressNodes = new Vector();
         r = new Random();
@@ -204,11 +197,6 @@ public class TelemetryMain extends MIDlet
         startListeningBaseStation();
     }
 
-    ////////////////////////////////////////////////////////////////////
-    //
-    // Service connection management - called from LocateService class
-    //
-    ////////////////////////////////////////////////////////////////////
 
     private void startListeningBaseStation()
     {
@@ -245,16 +233,10 @@ public class TelemetryMain extends MIDlet
 
 
     /**
-     * Called to declare that the connection to the host is no longer present.
+     * Called to any open connections to the host.
      */
     public void closeConnection()
     {
-        if (!connected)
-        {
-            return;
-        }
-//                          led1.setRGB(50,0,0);     // Red = not active
-        connected = false;
         rcvrBS.stop();
         Utils.sleep(100);
         try {
@@ -269,18 +251,10 @@ public class TelemetryMain extends MIDlet
         }
     }
     
-
-    //////////////////////////////////////////////////////////
-    //
-    // Command processing - called from PacketReceiver class
-    //
-    //////////////////////////////////////////////////////////
     
     /**
-     * Callback from PacketReceiver when a new command is received from the host.
-     * Note that commands associated with the accelerometer are dispatched directly
-     * to the AccelMonitor class's handlePacket() method.
-     * 
+     * Callback from PacketReceiver when a new command is received
+     * from the host.
      * @param type the command
      * @param pkt the radiogram with any other required information
      */
@@ -295,49 +269,21 @@ public class TelemetryMain extends MIDlet
                 case START_APP:
                         led8.setRGB(0, 0, 100);
                         led8.setOn();
-                        Utils.sleep(250);
+                        Utils.sleep(200);
                         led8.setOff();
                     break;
 
-                case RESET_LEACH_ENGINE:
-                    
-                    if(!resetStatus)
-                    {
-                        roundNumber = 0;
-        //                        blinkLEDs();
-                        if(isCH)
-                        {
-                            rcvrBS = null;
-                            startListeningBaseStation();
-                            
-                        }
-                        else
-                        {
-                            startListeningBaseStation();
-                        }
-                            
-                        isCH = false;
-                        isCT = false;
-                        flagTDMA = false;
-                        clusterHeadAddress = "";
-                        clusterHeadLed = 0;
-                        indexSlotTimmer = 0;
-                        clusterLength = 0;
-                    }
-                    resetStatus = true;
-                    
-                    break;
 
                 case ERASE_PERSISTENCE:
                     
-//                    if(!persistence.isNull())
-//                    {
-//                        persistence.deleteRecStoreOfTimeElapsed();
-//                        persistence.deleteRecStoreNonCoordinator();
-//                        persistence.deleteRecStoreCoordinator();
-//                    }
-//
-//                    persistence = new PersistenceUnit();
+                    if(!persistence.isNull())
+                    {
+                        persistence.deleteRecStoreOfTimeElapsed();
+                        persistence.deleteRecStoreNonCoordinator();
+                        persistence.deleteRecStoreCoordinator();
+                    }
+
+                    persistence = new PersistenceUnit();
                                                 
                         blinkLEDs();
                         led1.setRGB(50,0,0);     // Red = not active
@@ -358,24 +304,24 @@ public class TelemetryMain extends MIDlet
 
                     
 
-//                                try
-//                                {
-//                                    persistence.openRecordStoreForTimeElapsed();
-//                                    teste += persistence.readRecord();
-//                                    persistence.closeRecStore();
-//                                    persistence.openRecordStoreForNonCoordinatorMetric();
-//                                    teste += "\nPACKETS OF NON-COORDINATOR: \n";
-//                                    teste += persistence.readRecord();
-//                                    persistence.closeRecStore();
-//                                    persistence.openRecordStoreForCoordinatorMetric();
-//                                    teste += "\nPACKETS OF COORDINATOR: \n";
-//                                    teste += persistence.readRecord();
-//                                    persistence.closeRecStore();
-//                                }
-//                                catch (RecordStoreException ex)
-//                                {
-//                                    ex.printStackTrace();
-//                                }
+                    try
+                    {
+                        persistence.openRecordStoreForTimeElapsed();
+                        teste += persistence.readRecord();
+                        persistence.closeRecStore();
+                        persistence.openRecordStoreForNonCoordinatorMetric();
+                        teste += "\nPACKETS OF NON-COORDINATOR: \n";
+                        teste += persistence.readRecord();
+                        persistence.closeRecStore();
+                        persistence.openRecordStoreForCoordinatorMetric();
+                        teste += "\nPACKETS OF COORDINATOR: \n";
+                        teste += persistence.readRecord();
+                        persistence.closeRecStore();
+                    }
+                    catch (RecordStoreException ex)
+                    {
+                        ex.printStackTrace();
+                    }
 
                     dgtx.reset();
                     dgtx.writeByte(PERSISTENCE);
@@ -398,27 +344,28 @@ public class TelemetryMain extends MIDlet
                 case START_LEACH_ENGINE:
 
                     dgController = pkt;
+                    overAllCount++;
 
-//                    try
-//                    {
-//                        if(persistenceControl)
-//                        {
-//                            persistence.updateTimeElapsed( (byte)1,
-//                                    "Starting cycle: "
-//                                    +getTime(System.currentTimeMillis()));
-//                                persistenceControl = false;
-//                        }
-//                        else
-//                        {
-//                            persistence.updateTimeElapsed( (byte)2,
-//                                    "Ending cycle: "
-//                                    +getTime(System.currentTimeMillis()));
-//                        }
-//                    }
-//                    catch(Exception e)
-//                    {
-//                        e.printStackTrace();
-//                    }
+                    try
+                    {
+                        if(persistenceControl)
+                        {
+                            persistence.updateTimeElapsed( (byte)1,
+                                    "Starting cycle: "
+                                    +getTime(System.currentTimeMillis()));
+                                persistenceControl = false;
+                        }
+                        else
+                        {
+                            persistence.updateTimeElapsed( (byte)2,
+                                    "Ending cycle: "
+                                    +getTime(System.currentTimeMillis()));
+                        }
+                    }
+                    catch(Exception e)
+                    {
+                        e.printStackTrace();
+                    }
 
                     System.out.println("[System Information],"+
                             IEEEAddress.toDottedHex(Spot.getInstance().
@@ -426,19 +373,19 @@ public class TelemetryMain extends MIDlet
                             +", LEACH STARTED in, "
                             +getTime(System.currentTimeMillis()));
                     
-                    initialTime = System.currentTimeMillis();
-                    
-                    resetStatus = false;
+                    initialTime = System.currentTimeMillis(); 
                     joinStartTimeControl = false;
+                    controlADV = false;
 
                     leds.setOff();
                     led4.setRGB(0, 100, 100);
                     led4.setOn();
-                    Utils.sleep(250);
+                    Utils.sleep(90);
                     led4.setOff();
                     led7.setOff();
                     led8.setOff();
                     maxRssiCoordinator = 0;
+                    lastAddressAdv = 0L;
 
                     if(roundNumber >= 1/CLUSTER_HEAD_QUANTITY)
                     {
@@ -509,7 +456,7 @@ public class TelemetryMain extends MIDlet
                         
                         now = 0L;
 
-                        Utils.sleep(50);
+                        Utils.sleep(20);
 
                         try
                         {
@@ -519,10 +466,9 @@ public class TelemetryMain extends MIDlet
                                    BROADCAST_PORT);
                            Datagram xdg = txConn.newDatagram(ADV_PACKET_SIZE);
 
-
-                                               led6.setOff();
-                                               led6.setRGB(255,255,100);
-                                               led6.setOn();
+                           led6.setOff();
+                           led6.setRGB(255,255,100);
+                           led6.setOn();
 
                            System.out.println("[System Information], "+
                             IEEEAddress.toDottedHex(Spot.getInstance().
@@ -545,8 +491,8 @@ public class TelemetryMain extends MIDlet
 
                         Utils.sleep(50);
                         txConn.send(xdg);
-                        Utils.sleep(25);
-                        txConn.send(xdg);
+//                        Utils.sleep(20);
+//                        txConn.send(xdg);
                         advCountCH++;                           
 
                         rcvrBS.stop();
@@ -599,15 +545,18 @@ public class TelemetryMain extends MIDlet
 
                 case ADV_PACKET:
 
-                    dgController2 = pkt;
+                    
                     flagTDMA = false;
-                    boolean controlADV = false;
+                    
 
                     if(!isCH)
                     {
-                        if(maxRssiCoordinator < pkt.getRssi() && last)
+                        if(maxRssiCoordinator < pkt.getRssi() &&
+                                lastAddressAdv != pkt.getAddressAsLong())
                         {
+                            lastAddressAdv = pkt.getAddressAsLong();
                             maxRssiCoordinator = pkt.getRssi();
+
                             System.out.println("[System Information], "+
                             IEEEAddress.toDottedHex(Spot.getInstance().
                             getRadioPolicyManager().getIEEEAddress())
@@ -812,16 +761,11 @@ public class TelemetryMain extends MIDlet
                     break;
 
                 case BLINK_LEDS_REQ:
-                                blinkLEDs();
-                                if (connected)
-                                {
-                                    led1.setRGB(0, 30, 0);   // Green = connected
-                                }
-                                else
-                                {
-                                    led1.setRGB(50, 0, 0);   // Red = not active
-                                }
-                                led1.setOn();
+                    
+                    blinkLEDs();
+                    led1.setRGB(0, 30, 0);
+                    led1.setOn();
+
                 break;
                                    
             }
@@ -974,6 +918,8 @@ public class TelemetryMain extends MIDlet
         periodicTask = null;
         boolean control = false;
         sleepManager.enableDeepSleep(true);
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+
 
         while(true)
         {
@@ -1075,14 +1021,14 @@ public class TelemetryMain extends MIDlet
         System.out.println("Round: "
                 +roundNumber+", acomplished!");
 
-        for (int i = 0; i <= (roundNumber-1); i++)
-        {
+//        for (int i = 0; i <= (roundNumber-1); i++)
+//        {
             leds.setColor(LEDColor.MAGENTA);
             leds.setOn();
             Utils.sleep(200);
             leds.setOff();
-            Utils.sleep(200);
-        }
+//        }
+        Utils.sleep(1000);
 
         thread = null;
         rcvrBS.stop();
@@ -1104,32 +1050,36 @@ public class TelemetryMain extends MIDlet
         {
             e.printStackTrace();
         }
-//        try
-//        {
-//            // VERIFICAR O PQ DO RESULTADOS DOS CONTADORES
-//            persistence.updatePacketsCounterCoordinator
-//                    (PersistenceUnit.ADV_PACKET, String.valueOf(advCountCH));
-//            persistence.updatePacketsCounterCoordinator
-//                    (PersistenceUnit.JOIN_PACKET, String.valueOf(joinCountCH));
-//            persistence.updatePacketsCounterCoordinator
-//                    (PersistenceUnit.TDMA_PACKET, String.valueOf(tdmaCountCH));
-//            persistence.updatePacketsCounterCoordinator
-//                    (PersistenceUnit.DATA_PACKET, String.valueOf(dataCountCH));
-//            persistence.updatePacketsCounterNonCoordinator
-//                    (PersistenceUnit.ADV_PACKET, String.valueOf(advCountNode));
-//            persistence.updatePacketsCounterNonCoordinator
-//                    (PersistenceUnit.JOIN_PACKET, String.valueOf(joinCountNode));
-//            persistence.updatePacketsCounterNonCoordinator
-//                    (PersistenceUnit.TDMA_PACKET, String.valueOf(tdmaCountNode));
-//            persistence.updatePacketsCounterNonCoordinator
-//                    (PersistenceUnit.DATA_PACKET, String.valueOf(dataCountNode));
-//
-//            System.out.println("Contadores armazenados com sucesso.");
-//        }
-//        catch (Exception ex)
-//        {
-//            ex.printStackTrace();
-//        }
+        try
+        {
+            // VERIFICAR O PQ DO RESULTADOS DOS CONTADORES
+            persistence.updatePacketsCounterCoordinator
+                    (PersistenceUnit.ADV_PACKET, String.valueOf(advCountCH));
+            persistence.updatePacketsCounterCoordinator
+                    (PersistenceUnit.JOIN_PACKET, String.valueOf(joinCountCH));
+            persistence.updatePacketsCounterCoordinator
+                    (PersistenceUnit.TDMA_PACKET, String.valueOf(tdmaCountCH));
+            persistence.updatePacketsCounterCoordinator
+                    (PersistenceUnit.DATA_PACKET, String.valueOf(dataCountCH));
+            persistence.updatePacketsCounterCoordinator
+                    (PersistenceUnit.OVERALL, String.valueOf(overAllCount));
+            persistence.updatePacketsCounterNonCoordinator
+                    (PersistenceUnit.ADV_PACKET, String.valueOf(advCountNode));
+            persistence.updatePacketsCounterNonCoordinator
+                    (PersistenceUnit.JOIN_PACKET, String.valueOf(joinCountNode));
+            persistence.updatePacketsCounterNonCoordinator
+                    (PersistenceUnit.TDMA_PACKET, String.valueOf(tdmaCountNode));
+            persistence.updatePacketsCounterNonCoordinator
+                    (PersistenceUnit.DATA_PACKET, String.valueOf(dataCountNode));
+            persistence.updatePacketsCounterNonCoordinator
+                    (PersistenceUnit.OVERALL, String.valueOf(overAllCount));
+
+            System.out.println("Contadores armazenados com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+        }
         assignListeners();
         handlePacket(START_LEACH_ENGINE, dgController);
     }

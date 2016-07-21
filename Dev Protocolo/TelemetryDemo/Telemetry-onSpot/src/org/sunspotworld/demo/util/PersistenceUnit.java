@@ -17,6 +17,7 @@ public class PersistenceUnit
     public static final byte JOIN_PACKET = 2;
     public static final byte TDMA_PACKET = 3;
     public static final byte DATA_PACKET = 4;
+    public static final byte OVERALL = 5;
 
     public PersistenceUnit()
     {
@@ -30,8 +31,9 @@ public class PersistenceUnit
             }
             closeRecStore();
             openRecordStoreForCoordinatorMetric();
-            if (rsm.getNumRecords() < 4)
+            if (rsm.getNumRecords() < 5)
             {
+                writeRecord("0");
                 writeRecord("0");
                 writeRecord("0");
                 writeRecord("0");
@@ -39,8 +41,9 @@ public class PersistenceUnit
             }
             closeRecStore();
             openRecordStoreForNonCoordinatorMetric();
-            if (rsm.getNumRecords() < 4)
+            if (rsm.getNumRecords() < 5)
             {
+                writeRecord("0");
                 writeRecord("0");
                 writeRecord("0");
                 writeRecord("0");
@@ -94,6 +97,10 @@ public class PersistenceUnit
                 updateRecord(indexNumber, value);
                 closeRecStore();
                 break;
+            case OVERALL:
+                updateRecord(indexNumber, value);
+                closeRecStore();
+                break;
         }
     }
 
@@ -117,6 +124,10 @@ public class PersistenceUnit
                 closeRecStore();
                 break;
             case DATA_PACKET:
+                updateRecord(indexNumber, value);
+                closeRecStore();
+                break;
+            case OVERALL:
                 updateRecord(indexNumber, value);
                 closeRecStore();
                 break;
