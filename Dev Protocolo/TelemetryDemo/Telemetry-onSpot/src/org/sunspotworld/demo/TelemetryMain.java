@@ -491,8 +491,8 @@ public class TelemetryMain extends MIDlet
 
                         Utils.sleep(50);
                         txConn.send(xdg);
-//                        Utils.sleep(20);
-//                        txConn.send(xdg);
+                        Utils.sleep(20);
+                        txConn.send(xdg);
                         advCountCH++;                           
 
                         rcvrBS.stop();
