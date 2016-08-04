@@ -41,11 +41,13 @@ import com.sun.spot.resources.transducers.ITriColorLED;
 import com.sun.spot.resources.transducers.ITriColorLEDArray;
 import com.sun.spot.resources.transducers.LEDColor;
 import com.sun.spot.service.BootloaderListenerService;
+import com.sun.spot.util.Queue;
 
 
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Random;
 import java.util.Vector;
 import javax.microedition.io.Connector;
@@ -122,19 +124,19 @@ public class TelemetryMain extends MIDlet
     private PeriodicTask periodicTask;
     private ISleepManager sleepManager = Spot.getInstance().getSleepManager();
 
-    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.
-            lookup(ITriColorLEDArray.class);
-
-    private ITriColorLED led1 = leds.getLED(0);
-    private ITriColorLED led2 = leds.getLED(1);
-    private ITriColorLED led4 = leds.getLED(3);
-    private ITriColorLED led6 = leds.getLED(5);
-    private ITriColorLED led7 = leds.getLED(6);
-    private ITriColorLED led8 = leds.getLED(7);
+//    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.
+//            lookup(ITriColorLEDArray.class);
+//
+//    private ITriColorLED led1 = leds.getLED(0);
+//    private ITriColorLED led2 = leds.getLED(1);
+//    private ITriColorLED led4 = leds.getLED(3);
+//    private ITriColorLED led6 = leds.getLED(5);
+//    private ITriColorLED led7 = leds.getLED(6);
+//    private ITriColorLED led8 = leds.getLED(7);
 
     //LEACH Variables
 
-    private int timeMainLoopApplication = 80;
+    private int timeMainLoopApplication = 70;
     private long initialTime = -1;
     private double randomNumber = 0.0;
     private byte roundNumber = 0;
@@ -142,11 +144,11 @@ public class TelemetryMain extends MIDlet
     private boolean isCH = false;
     private boolean isCT = false;
     private int maxRssiCoordinator = 0;
-    private String clusterHeadAddress = "";
+    private static String clusterHeadAddress = "";
     private int clusterHeadLed = 0;
     private byte indexSlotTimmer = 0;
     private byte clusterLength = 0;
-    private final int tdmaSlotTime = 20000;
+    private final int tdmaSlotTime = 60000;
     private Datagram dataPacket;
     private boolean flagTDMA = false;
     private boolean dataPacketPhase = true;
@@ -173,6 +175,7 @@ public class TelemetryMain extends MIDlet
     //moving coordinator
     private long ourMacAddress;
     private Thread thread = null;
+    private Thread threadJoin = null;
     private int ledColor = 0;
     private long now = 0L;
     private Vector addressNodes;
@@ -183,17 +186,32 @@ public class TelemetryMain extends MIDlet
 
     public void initialize() 
     {
+        threadJoin = new Thread(new Runnable()
+                       {
+                           public void run()
+                           {
+                                try
+                                {
+                                    replyJoins();
+                                }
+                                catch (IOException ex)
+                                {
+                                    ex.printStackTrace();
+                                }
+                           }
+                       }
+                    );
+                    
                 if(persistence == null)
                 {
                     persistence = new PersistenceUnit();
                     System.out.println("[System Information] Instantiating "
                             + "Persistence Unit");
                 }
-            
         addressNodes = new Vector();
         r = new Random();
-                                led1.setRGB(50,0,0);     // Red = not active
-                                led1.setOn();
+//                                led1.setRGB(50,0,0);     // Red = not active
+//                                led1.setOn();
         startListeningBaseStation();
     }
 
@@ -267,10 +285,10 @@ public class TelemetryMain extends MIDlet
             {
                 //Base station commands
                 case START_APP:
-                        led8.setRGB(0, 0, 100);
-                        led8.setOn();
+//                        led8.setRGB(0, 0, 100);
+//                        led8.setOn();
                         Utils.sleep(200);
-                        led8.setOff();
+//                        led8.setOff();
                     break;
 
 
@@ -285,9 +303,9 @@ public class TelemetryMain extends MIDlet
 
                     persistence = new PersistenceUnit();
                                                 
-                        blinkLEDs();
-                        led1.setRGB(50,0,0);     // Red = not active
-                        led1.setOn();
+//                        blinkLEDs();
+//                        led1.setRGB(50,0,0);     // Red = not active
+//                        led1.setOn();
 
                     break;
 
@@ -333,10 +351,10 @@ public class TelemetryMain extends MIDlet
                     System.out.println("Tamanho da string: "+teste.length());
                     System.out.println("Conteudo: "+teste);
 
-                    blinkLEDs();
-                    
-                    led1.setRGB(50,0,0);     // Red = not active
-                    led1.setOn();
+//                    blinkLEDs();
+//
+//                    led1.setRGB(50,0,0);     // Red = not active
+//                    led1.setOn();
 
                     break;
 
@@ -377,13 +395,13 @@ public class TelemetryMain extends MIDlet
                     joinStartTimeControl = false;
                     controlADV = false;
 
-                    leds.setOff();
-                    led4.setRGB(0, 100, 100);
-                    led4.setOn();
-                    Utils.sleep(90);
-                    led4.setOff();
-                    led7.setOff();
-                    led8.setOff();
+//                    leds.setOff();
+//                    led4.setRGB(0, 100, 100);
+//                    led4.setOn();
+                    Utils.sleep(100);
+//                    led4.setOff();
+//                    led7.setOff();
+//                    led8.setOff();
                     maxRssiCoordinator = 0;
                     lastAddressAdv = 0L;
 
@@ -406,8 +424,8 @@ public class TelemetryMain extends MIDlet
                     if(isCT)
                     {
                         probability = 0;
-                        led8.setColor(LEDColor.RED);
-                        led8.setOn();
+//                        led8.setColor(LEDColor.RED);
+//                        led8.setOn();
                     }
                     else
                     {
@@ -425,11 +443,10 @@ public class TelemetryMain extends MIDlet
                     if(randomNumber<probability)
                     {
                         roundNumber++;
-                        led1.setRGB(0, 50, 0);
-                        led1.setOn();
-                        
+//                        led1.setRGB(0, 50, 0);
+//                        led1.setOn();
+                        rcvrBS.unregisterHandler(this,ADV_PACKET);
                         init();
-
                         isCH = true;
 
                         System.out.println("[System Information],"+
@@ -439,14 +456,13 @@ public class TelemetryMain extends MIDlet
                             +getTime(System.currentTimeMillis()));
 
                         clusterHeadLed = ledColor;
-                        leds.getLED(clusterHeadLed).setOff();
-                        leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
-                        leds.getLED(clusterHeadLed).setOn();
-
-
-                        led6.setOff();
-                        led6.setRGB(clusterHeadLed,40,100);
-                        led6.setOn();
+//                        leds.getLED(clusterHeadLed).setOff();
+//                        leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
+//                        leds.getLED(clusterHeadLed).setOn();
+//
+//                        led6.setOff();
+//                        led6.setRGB(clusterHeadLed,40,100);
+//                        led6.setOn();
 
                         if(txConn != null)
                         {
@@ -466,9 +482,9 @@ public class TelemetryMain extends MIDlet
                                    BROADCAST_PORT);
                            Datagram xdg = txConn.newDatagram(ADV_PACKET_SIZE);
 
-                           led6.setOff();
-                           led6.setRGB(255,255,100);
-                           led6.setOn();
+//                           led6.setOff();
+//                           led6.setRGB(255,255,100);
+//                           led6.setOn();
 
                            System.out.println("[System Information], "+
                             IEEEAddress.toDottedHex(Spot.getInstance().
@@ -476,24 +492,23 @@ public class TelemetryMain extends MIDlet
                             +", seding ADV_PACKET in, "
                             +getTime(System.currentTimeMillis()));
 
-                        if (led6 != null)
-                        {
-                            led6.setRGB(ledColor,40,0);
-                            led6.setOn();
-                        }
+//                        if (led6 != null)
+//                        {
+//                            led6.setRGB(ledColor,40,0);
+//                            led6.setOn();
+//                        }
 
                         xdg = mountAdvPacket(ADV_PACKET, xdg,
                                    ourMacAddress, ledColor);
 
-                        led6.setOff();
-                        led6.setColor(LEDColor.YELLOW);
-                        led6.setOn();
+//                        led6.setOff();
+//                        led6.setColor(LEDColor.YELLOW);
+//                        led6.setOn();
 
-                        Utils.sleep(50);
-                        txConn.send(xdg);
                         Utils.sleep(20);
                         txConn.send(xdg);
-                        advCountCH++;                           
+                        //Utils.sleep(70);
+                        advCountCH++;
 
                         rcvrBS.stop();
 
@@ -508,8 +523,6 @@ public class TelemetryMain extends MIDlet
                         rcvrBS.registerHandler(this, DATA_PACKET);
                         rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
                         rcvrBS.registerHandler(this, JOIN_PACKET);
-                        rcvrBS.registerHandler(this, ADV_PACKET);
-                        rcvrBS.registerHandler(this, START_LEACH_ENGINE);
                         rcvrBS.start();
                            
                         System.out.println("[System Information], "+
@@ -537,44 +550,28 @@ public class TelemetryMain extends MIDlet
                     {
                         isCH = false;
                         roundNumber++;
-                        led1.setRGB(0, 50, 0);
-                        led1.setOn();
+//                        led1.setRGB(0, 50, 0);
+//                        led1.setOn();
                         init();
                     }
                     break;
 
                 case ADV_PACKET:
 
+                    advCountNode++;
                     
                     flagTDMA = false;
-                    
 
                     if(!isCH)
                     {
-                        if(maxRssiCoordinator < pkt.getRssi() &&
-                                lastAddressAdv != pkt.getAddressAsLong())
+                        if(maxRssiCoordinator < pkt.getRssi())
                         {
-                            lastAddressAdv = pkt.getAddressAsLong();
                             maxRssiCoordinator = pkt.getRssi();
-
-                            System.out.println("[System Information], "+
-                            IEEEAddress.toDottedHex(Spot.getInstance().
-                            getRadioPolicyManager().getIEEEAddress())
-                            +", is CH"+isCH+" receiving ADV_Packet from: "+
-                            pkt.getAddress()+" in,"
-                            +getTime(System.currentTimeMillis()));
-
-                            cleanCHLeds(); //set off ch's leds indicators
-
+                            clusterHeadAddress = pkt.getAddress();
                             pkt.resetRead();
                             pkt.readByte();
-                            long address = pkt.readLong();
+                            pkt.readLong();
                             clusterHeadLed = pkt.readInt();
-                            leds.getLED(clusterHeadLed).setOff();
-                            leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
-                            leds.getLED(clusterHeadLed).setOn();
-                            clusterHeadAddress = IEEEAddress.
-                                    toDottedHex(address);
                         }
 
                         if(!controlADV)
@@ -599,6 +596,35 @@ public class TelemetryMain extends MIDlet
                         }
                     }
 
+                    
+                    
+//                    if(!isCH && maxRssiCoordinator < pkt.getRssi())
+//                    {
+//                            //lastAddressAdv = pkt.getAddressAsLong();
+//                            maxRssiCoordinator = pkt.getRssi();
+//
+//                            System.out.println("[System Information], "+
+//                            IEEEAddress.toDottedHex(Spot.getInstance().
+//                            getRadioPolicyManager().getIEEEAddress())
+//                            +", is CH"+isCH+" receiving ADV_Packet from: "+
+//                            pkt.getAddress()+" in,"
+//                            +getTime(System.currentTimeMillis()));
+//
+//                            cleanCHLeds(); //set off ch's leds indicators
+//
+//                            pkt.resetRead();
+//                            pkt.readByte();
+//                            long address = pkt.readLong();
+//                            clusterHeadLed = pkt.readInt();
+//                            leds.getLED(clusterHeadLed).setOff();
+//                            leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
+//                            leds.getLED(clusterHeadLed).setOn();
+//
+//                            clusterHeadAddress = IEEEAddress.
+//                                    toDottedHex(address);
+//
+//                            advCountNode++;
+
                     break;
 
                 case JOIN_PACKET:
@@ -606,29 +632,9 @@ public class TelemetryMain extends MIDlet
                    if(!joinStartTimeControl)
                    {
                        joinStartTimeControl = true;
-
-                       thread = new Thread(new Runnable()
-                       {
-                           public void run()
-                           {
-                                try
-                                {
-                                    replyJoins();
-                                }
-                                catch (IOException ex)
-                                {
-                                    ex.printStackTrace();
-                                }
-                           }
-                       }
-                    );
-                        thread.setPriority(Thread.MAX_PRIORITY);
-                        thread.start();
+                        threadJoin.setPriority(Thread.NORM_PRIORITY);
+                        threadJoin.start();
                     }
-
-                   led6.setOff();
-                   led6.setRGB(0, 255, 0);
-                   led6.setOn();
 
                     if(!addressNodes.contains(pkt.getAddress()))
                     {
@@ -641,9 +647,9 @@ public class TelemetryMain extends MIDlet
                             +getTime(System.currentTimeMillis()));
                     }
 
-                   led6.setOff();
-                   led6.setColor(LEDColor.CYAN);
-                   led6.setOn();
+//                   led6.setOff();
+//                   led6.setColor(LEDColor.CYAN);
+//                   led6.setOn();
 
                    break;
 
@@ -660,6 +666,7 @@ public class TelemetryMain extends MIDlet
                     pkt.resetRead();
                     pkt.readByte();
                     double fator = 0;
+                    int tempFix = 0;
 
                     txConn = null;
 
@@ -667,8 +674,12 @@ public class TelemetryMain extends MIDlet
                     indexSlotTimmer++;
                     clusterLength = pkt.readByte();
                     fator = ((double)indexSlotTimmer/(double)clusterLength);
+
                     int time = (int)(tdmaSlotTime*fator);
 
+                    tempFix = (int) 200-(200*(int)(Math.ceil(fator*100)/100));
+                    
+                    Utils.sleep(tempFix);
 
                     System.out.println("[System Information], "+IEEEAddress.
                                     toDottedHex(Spot.getInstance().
@@ -678,7 +689,8 @@ public class TelemetryMain extends MIDlet
                                     +indexSlotTimmer+"\n -ClusterLength: "+
                                     clusterLength+"\nisCH: "+isCH+"\nFlagTMDA: "
                                     +flagTDMA+"\nTDMA slot time"+tdmaSlotTime
-                                    +"\n"+ "Factor: "+fator+" in,"+
+                                    +"\n"+ "Factor: "+Math.ceil(fator*100)/100
+                                    +" in,"+
                                     getTime(System.currentTimeMillis()));
 
                    txConn = (RadiogramConnection) Connector.
@@ -695,14 +707,21 @@ public class TelemetryMain extends MIDlet
                    rcvrBS.stop();
                    thread = null;
 
-                   Utils.sleep(time);
+                   Utils.sleep(time+10);
 
                    txConn.setRadioPolicy(RadioPolicy.ON);
                    dataPacket.reset();
                    dataPacket.writeByte(DATA_PACKET);
                    dataPacket.writeInt(10); //supposed value collected from transductor
-                   txConn.send(dataPacket);
-                   Utils.sleep(20);
+
+                   for(int i = 0; i < QTDDATAPKT; i++)
+                   {
+                       txConn.send(dataPacket);
+                       Utils.sleep(10);
+                       dataCountNode++;
+                   }
+
+
                    if (txConn != null)
                    {
                        txConn.close();
@@ -710,13 +729,13 @@ public class TelemetryMain extends MIDlet
                    }
                    Utils.sleep((tdmaSlotTime - time));
                    rcvrBS.start();
-                   dataCountNode++;
+
                   
                 break;
 
                 case DATA_PACKET:
-
-                    //long nowDataPacket = 0L;
+//
+//                    //long nowDataPacket = 0L;
                     dataCountCH++;
                     if(dataPacketPhase)
                     {
@@ -733,7 +752,7 @@ public class TelemetryMain extends MIDlet
                         //aggregator.start();
                         dataPacketPhase = false;
                     }
-                    
+
                     System.out.println("[System Information], "+
                             IEEEAddress.toDottedHex(Spot.getInstance().
                             getRadioPolicyManager().getIEEEAddress())
@@ -762,9 +781,9 @@ public class TelemetryMain extends MIDlet
 
                 case BLINK_LEDS_REQ:
                     
-                    blinkLEDs();
-                    led1.setRGB(0, 30, 0);
-                    led1.setOn();
+//                    blinkLEDs();
+//                    led1.setRGB(0, 30, 0);
+//                    led1.setOn();
 
                 break;
                                    
@@ -775,7 +794,6 @@ public class TelemetryMain extends MIDlet
             closeConnection();
         }
     }
-
 
     //Print long time format to display
     public static String getTime(long millis)
@@ -800,62 +818,78 @@ public class TelemetryMain extends MIDlet
 
     
     // handle Blink LEDs command
-    private void blinkLEDs()
-    {
-        for (int i = 0; i < 4; i++)
-        {          // blink LEDs 10 times = 10 seconds
-                        leds.setColor(LEDColor.MAGENTA);
-                        leds.setOn();
-                        Utils.sleep(250);
-                        leds.setOff();
-                        Utils.sleep(250);
-        }
-    }
+//    private void blinkLEDs()
+//    {
+//        for (int i = 0; i < 4; i++)
+//        {          // blink LEDs 10 times = 10 seconds
+//                        leds.setColor(LEDColor.MAGENTA);
+//                        leds.setOn();
+//                        Utils.sleep(250);
+//                        leds.setOff();
+//                        Utils.sleep(250);
+//        }
+//    }
 
     private void waitForAdvPackets() throws IOException
     {
-        advCountNode++;
-        Utils.sleep(200);
+   
+        Utils.sleep(350);
+
         if(thread == Thread.currentThread())
         {
-            txConn = (RadiogramConnection) Connector.
-                open("radiogram://"+clusterHeadAddress+":"
-                +CONNECTED_PORT);
-        txConn.setTimeout(-1);
-        Datagram answerCH = txConn.
-                newDatagram(JOIN_PACKET_SIZE);
-        answerCH.writeByte(JOIN_PACKET);
-        //Utils.sleep(150);
-        txConn.send(answerCH);
-        txConn.close();
-        joinCountNode++;
-        txConn = null;
-        rcvrBS.stop();
-        hostConn.close();
-        hostConn = (RadiogramConnection) Connector.
-                open("radiogram://:"+CONNECTED_PORT);
-        rcvrBS = null;
-        rcvrBS = new PacketReceiver(hostConn);
-        rcvrBS.registerHandler(this, TDMA_PACKET);
-        rcvrBS.registerHandler(this, DATA_PACKET);
-        rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
-        rcvrBS.registerHandler(this, JOIN_PACKET);
-        rcvrBS.registerHandler(this, ADV_PACKET);
-        rcvrBS.registerHandler(this, START_LEACH_ENGINE);
-        rcvrBS.start();
+                System.out.println("[System Information], "+
+                    IEEEAddress.toDottedHex(Spot.getInstance().
+                    getRadioPolicyManager().getIEEEAddress())
+                    +", is CH"+isCH+" receiving ADV_Packet from: "+
+                    clusterHeadAddress+" in,"
+                    +getTime(System.currentTimeMillis()));
 
-        System.out.println("[System Information], "+
-        IEEEAddress.toDottedHex(Spot.getInstance().
-        getRadioPolicyManager().getIEEEAddress())
-        +", is waiting for TDMA_Packet in,"
-        +getTime(System.currentTimeMillis()));
+//                    cleanCHLeds(); //set off ch's leds indicators
+
+//                    leds.getLED(clusterHeadLed).setOff();
+//                    leds.getLED(clusterHeadLed).setRGB(255, 255, 255);
+//                    leds.getLED(clusterHeadLed).setOn();
+
+                    Utils.sleep(10);
+                    
+                    txConn = (RadiogramConnection) Connector.
+                             open("radiogram://"+clusterHeadAddress+":"
+                             +CONNECTED_PORT);
+
+                    //txConn.setTimeout(-1);
+                    Datagram answerCH = txConn.
+                            newDatagram(JOIN_PACKET_SIZE);
+                    answerCH.writeByte(JOIN_PACKET);
+                    //Utils.sleep(150);
+                    txConn.send(answerCH);
+                    txConn.close();
+                    joinCountNode++;
+                    txConn = null;
+                    rcvrBS.stop();
+                    hostConn.close();
+                    hostConn = (RadiogramConnection) Connector.
+                            open("radiogram://:"+CONNECTED_PORT);
+                    rcvrBS = null;
+                    rcvrBS = new PacketReceiver(hostConn);
+                    rcvrBS.registerHandler(this, TDMA_PACKET);
+                    rcvrBS.registerHandler(this, DATA_PACKET);
+                    rcvrBS.registerHandler(this, RESET_LEACH_ENGINE);
+                    rcvrBS.registerHandler(this, JOIN_PACKET);
+                    rcvrBS.registerHandler(this, ADV_PACKET);
+                    rcvrBS.registerHandler(this, START_LEACH_ENGINE);
+                    rcvrBS.start();
+
+                    System.out.println("[System Information], "+
+                    IEEEAddress.toDottedHex(Spot.getInstance().
+                    getRadioPolicyManager().getIEEEAddress())
+                    +", is waiting for TDMA_Packet in,"
+                    +getTime(System.currentTimeMillis()));
         }
-
     }
 
     private void replyJoins() throws IOException
     {
-        Utils.sleep(300); // waiting for vector fillment
+        Utils.sleep(200); // waiting for vector fillment
 
         System.out.println("[System Information], "+
                             IEEEAddress.toDottedHex(Spot.getInstance().
@@ -886,10 +920,10 @@ public class TelemetryMain extends MIDlet
             newDg.writeByte(addressNodes.indexOf(addressNodes.elementAt(i)));
             newDg.writeByte(addressNodes.size());
             txConn.send(newDg);
-
+            tdmaCountCH++;
+            Utils.sleep(20);
             txConn.close();
             txConn = null;
-            tdmaCountCH++;
         }
 
         System.out.println("[System Information], "+
@@ -918,7 +952,7 @@ public class TelemetryMain extends MIDlet
         periodicTask = null;
         boolean control = false;
         sleepManager.enableDeepSleep(true);
-        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+        //Thread.currentThread().setPriority(Thread.MAX_PRIORITY-1);
 
 
         while(true)
@@ -937,8 +971,8 @@ public class TelemetryMain extends MIDlet
                     rcvrBS.registerHandler(this, DATA_PACKET);
                     rcvrBS.start();
 
-                    timeMainLoopApplication = 30000;
-                    periodicTask = new PeriodicTask(this, 0, tdmaSlotTime+6000);
+                    timeMainLoopApplication = Integer.MAX_VALUE;
+                    periodicTask = new PeriodicTask(this, 0, tdmaSlotTime+7000);
                     periodicTask.start();
                     control = true;
                 }
@@ -1017,20 +1051,18 @@ public class TelemetryMain extends MIDlet
 
     public void doTask()
     {
+        //Adicionar 1000 ms desse trecho no PeriodicTimer
+
+//        System.out.println(IEEEAddress.toDottedHex(Spot.getInstance().
+//                getRadioPolicyManager().getIEEEAddress())+",Start - doTask()"
+//                +getTime(System.currentTimeMillis()));
+
         System.gc();
         System.out.println("Round: "
                 +roundNumber+", acomplished!");
 
-//        for (int i = 0; i <= (roundNumber-1); i++)
-//        {
-            leds.setColor(LEDColor.MAGENTA);
-            leds.setOn();
-            Utils.sleep(200);
-            leds.setOff();
-//        }
-        Utils.sleep(1000);
-
         thread = null;
+        threadJoin = null;
         rcvrBS.stop();
 
         try
@@ -1050,6 +1082,23 @@ public class TelemetryMain extends MIDlet
         {
             e.printStackTrace();
         }
+
+        threadJoin = new Thread(new Runnable()
+                       {
+                           public void run()
+                           {
+                                try
+                                {
+                                    replyJoins();
+                                }
+                                catch (IOException ex)
+                                {
+                                    ex.printStackTrace();
+                                }
+                           }
+                       }
+                    );
+
         try
         {
             // VERIFICAR O PQ DO RESULTADOS DOS CONTADORES
@@ -1074,7 +1123,7 @@ public class TelemetryMain extends MIDlet
             persistence.updatePacketsCounterNonCoordinator
                     (PersistenceUnit.OVERALL, String.valueOf(overAllCount));
 
-            System.out.println("Contadores armazenados com sucesso.");
+            System.out.println("The counters has been recorded sucessfully.");
         }
         catch (Exception ex)
         {
@@ -1082,15 +1131,19 @@ public class TelemetryMain extends MIDlet
         }
         assignListeners();
         handlePacket(START_LEACH_ENGINE, dgController);
+
+//        System.out.println(IEEEAddress.toDottedHex(Spot.getInstance().
+//                getRadioPolicyManager().getIEEEAddress())+",End - doTask()"
+//                +getTime(System.currentTimeMillis()));
     }
 
-    private void cleanCHLeds()
-    {
-        for(int i = 1; i < 5; i++)
-        {
-            leds.getLED(i).setOff();
-        }
-    }
+//    private void cleanCHLeds()
+//    {
+//        for(int i = 1; i < 5; i++)
+//        {
+//            leds.getLED(i).setOff();
+//        }
+//    }
 
 }
 

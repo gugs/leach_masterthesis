@@ -54,6 +54,7 @@ public class PacketReceiver extends Resource implements IService {
     private String name = "Command Dispatcher";
     private RadiogramConnection rcvConn = null;
     
+    
     /**
      * Creates a new instance of a PacketReceiver.
      *
@@ -222,7 +223,7 @@ public class PacketReceiver extends Resource implements IService {
                     receiverLoop();
                 }
             };
-            thread.setPriority(Thread.MAX_PRIORITY - 2);
+            thread.setPriority(Thread.MAX_PRIORITY);
             thread.start();
             System.out.println("Starting packet receiver: " + name);
         }
