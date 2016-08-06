@@ -4,7 +4,7 @@
 
 # These folders are described bellow:
 
-# ExtractorToCastaliaSimulationOutput/OutputHandler: Program in Java to extract last action performed by sensor node using Castalia-Trace file.
+# ExtractorToCastaliaSimulationOutput/OutputHandler: Program in Java to extract last action performed by sensor node in Castalia-Trace file.
 
 # Telemetry: LEACH protocol developed to deploy on SunSPOT sensor platform.
 
