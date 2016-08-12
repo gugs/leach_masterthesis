@@ -2,7 +2,7 @@
 
 # leach_masterthesis
 
-# These folders are described bellow:
+# Those folders are described bellow:
 
 # ExtractorToCastaliaSimulationOutput/OutputHandler: Program in Java to extract last action performed by sensor node in Castalia-Trace file.
 
